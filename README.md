@@ -12,12 +12,12 @@ Almost every bit of TCP plumbing (that is, anything in between an
 application client and application server) involves this pattern
 represented in pseudo-code:
 
-  Thread:
-    while True:
-      SocketA.send(SocketB.recv())
-  Thread:
-    while True:
-      SocketB.send(SocketA.recv())
+	Thread:
+	  while True:
+	    SocketA.send(SocketB.recv())
+	Thread:
+	  while True:
+	    SocketB.send(SocketA.recv())
 
 This is how you write proxies and, well, pretty much everything else is
 a variation on a proxy (routers, balancers, gateways, tunnels, etc). What you do
@@ -27,7 +27,7 @@ or a port forwarder. The idea is this pattern should be optimized and
 made available to all languages. This is socket joining, the primary
 primitive of Megasock:
 
-  MegaSock_Join(SocketA, SocketB)
+	MegaSock_Join(SocketA, SocketB)
 
 Everything is taken care of for you. You can unjoin them at any time.
 You can *join* them at any time. In fact, that's a feature so you can
@@ -51,8 +51,30 @@ Write more...
 
 ## Another core primitive
 
-inspect
+	inspect # good api for efficiently seeking into a sockets buffer
+
+## Possible:
+
+New slightly higher level, faster socket primitive? ZMQ-inspired...
+
+	socket = Socket()
+	socket.connect("tcp://domain.com:5050")
+	# or 
+	socket.bind("tcp://0.0.0.0:9000") # auto listen()
+	socket.accept() # pulls from queue of auto accepted connections
+	socket.join(othersocket) # socket joining built in
+	socket.readline() # auto-filelike object
+	
+	# see next section
+	socket.setmsgcodec(WEBSOCKET | ZMQ | HTTPCHUNKED)
+	socket.get()
+	socket.put()
 
 ## Messaging layer!
 
 A whole new level
+
+	msg_codec
+	msg_route
+	msg_get
+	msg_put
