@@ -23,6 +23,7 @@ server/listen session. A really simple (fast) proxy!
 """
 import socket
 import sys
+import os
 sys.path.append(".")
 sys.path.append("..")
 
@@ -30,15 +31,18 @@ import megasock
 
 ctx = megasock.init()
 
+backend_port = os.environ.get("PORT", 8000)
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 try:
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind(("0.0.0.0", 10000))
     server.listen(1024)
 
     while True:
         conn, address = server.accept()
-        backend = socket.create_connection(("0.0.0.0", 8000))
+        backend = socket.create_connection(("0.0.0.0", backend_port))
         megasock.join(ctx, conn, backend)
 finally:
+    server.close()
     megasock.term(ctx)
 
