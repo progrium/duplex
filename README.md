@@ -55,9 +55,10 @@ See the examples directory for ideas.
 
 ## Phase 2: More powerful, higher level socket API
 
-If this works, then we start exposing more kernel tricks (sharing
-sockets across processes, sendfile, splice, tee, etc) and higher level
-functionality into a simple API that looks like maybe BSD sockets "v2".
+If socket joining works, then we start exposing more kernel tricks
+(sharing sockets across processes, sendfile, splice, tee, etc) and
+higher level functionality into a simple API that looks like maybe BSD
+sockets "v2".
 
 	socket = duplex.Socket()
 	socket.connect("tcp://domain.com:5050")
@@ -102,7 +103,7 @@ to TCP gateway, it might look like this:
 
 Pluggable, fast messaging right on the socket!
 
-Megasock would come with various message codecs in C so you get efficient
+Duplex would come with various message codecs in C so you get efficient
 messaging support in all languages. Keep in mind this is not about
 handshakes or actually implementing the protocol, it's about the stream
 of message frames or payloads, nothing more.
