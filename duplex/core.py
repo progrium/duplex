@@ -32,11 +32,15 @@ class JoinStream(object):
         self.transform = transform
         self.link_close = link_close
 
-    def stop(self):
+    def stop(self, close=False):
         self.socket_from.streams_out.remove(self)
+        if close and self.link_close:
+            self.socket_from.mark_to_close()
         self.socket_from = None
 
         self.socket_to.streams_in.remove(self)
+        if close and self.link_close:
+            self.socket_to.mark_to_close()
         self.socket_to = None
 
     def __repr__(self):
@@ -57,6 +61,7 @@ class ManagedSocket(object):
         self.write_buffer = bytearray()
         self.socket = socket
         self.socket.setblocking(0)
+        #print "new managed socket: {}".format(socket)
 
     def __call__(self):
         return self.socket
@@ -72,13 +77,12 @@ class ManagedSocket(object):
     def accept(self, ctx):
         """new connections inherit joins on listening socket"""
         conn, address = self.socket.accept()
-        managed = ctx.managed_socket(conn)
         for out_stream in self.streams_out:
-            JoinStream(ctx, self.socket, out_stream.socket_to(),
+            JoinStream(ctx, conn, out_stream.socket_to(),
                         transform=out_stream.transform,
                         link_close=out_stream.link_close)
         for in_stream in self.streams_in:
-            JoinStream(ctx, in_stream.socket_from(), self.socket,
+            JoinStream(ctx, in_stream.socket_from(), conn,
                         transform=in_stream.transform,
                         link_close=in_stream.link_close)
 
@@ -89,39 +93,44 @@ class ManagedSocket(object):
             data = self.socket.recv(4096)
             if data:
                 for stream in self.streams_out:
-                    if stream.transform is not None:
-                        d = stream.transform(data)
-                    else:
-                        d = data
                     out = stream.socket_to
-                    if out() in writables and not out.write_buffer:
-                        out().send(d)
-                    else:
-                        out.write_buffer.extend(d)
+                    if out:
+                        if stream.transform is not None:
+                            d = stream.transform(data)
+                        else:
+                            d = data
+                        if out() in writables and not out.write_buffer:
+                            out().send(d)
+                        else:
+                            out.write_buffer.extend(d)
             else:
-                self.close_ready = True
+                self.mark_to_close()
         except socket.error:
             # lets just assume it died
-            self.close_ready = True
-            self.write_buffer = bytearray()
+            self.mark_to_close()
 
     def flush_write_buffer(self):
         assert self.write_buffer
         bytes = self.socket.send(self.write_buffer)
         self.write_buffer = self.write_buffer[bytes:]
 
+    def mark_to_close(self):
+        assert self.socket
+        #print "socket marked to close: {}".format(self.socket)
+        self.close_ready = True
+
     def close(self):
         assert self.close_ready
         assert not self.write_buffer
+        #print "closing socket: {}".format(self.socket)
         for stream in self.streams_out:
-            stream.stop()
-            if stream.link_close and stream.socket_to:
-                stream.socket_to.close_ready = True
+            stream.stop(close=True)
         for stream in self.streams_in:
-            stream.stop()
-            if stream.link_close and stream.socket_from:
-                stream.socket_from.close_ready = True
+            stream.stop(close=True)
         self.socket.close()
+        socket = self.socket
+        self.socket = None
+        return socket
 
 
 class Context(object):
@@ -130,8 +139,13 @@ class Context(object):
     sockets = {}
     thread = None
     active = True
+    join_queue = None
+    unjoin_queue = None
 
     def __init__(self):
+        self.sockets = {}
+        self.join_queue = []
+        self.unjoin_queue = []
         self.thread = threading.Thread(target=self.loop)
         self.thread.start()
 
@@ -158,6 +172,8 @@ class Context(object):
 
     def loop(self):
         while self.active:
+            self.do_api_ops()
+
             readables, writables, errs = select.select(
                                             self.readables(),
                                             self.writables(),
@@ -174,6 +190,17 @@ class Context(object):
 
             self.close_finished_sockets()
 
+    def do_api_ops(self):
+        join_ops = self.join_queue[:]
+        self.join_queue = []
+        for args in join_ops:
+            self.join(*args)
+
+        unjoin_ops = self.unjoin_queue[:]
+        self.unjoin_queue = []
+        for args in unjoin_ops:
+            self.unjoin(*args)
+
     def readables(self):
         return [socket() for socket in self.sockets.values() if
                 len(socket.streams_out)]
@@ -185,40 +212,35 @@ class Context(object):
     def close_finished_sockets(self):
         for socket in self.sockets.values():
             if socket.close_ready and not socket.write_buffer:
-                socket.close()
-                self.sockets.pop(socket())
+                self.sockets.pop(socket.close())
 
     def flush_buffered_writables(self, writables):
         for socket in self.sockets.values():
             if socket.write_buffer and socket() in writables:
                 while len(socket.write_buffer):
                     try:
+                        #print "flushing"
                         socket.flush_write_buffer()
                     except Exception:
                         break
                 
-def init():
-    #ctx = _context()
-    #ctx.thread = threading.Thread(target=_context_loop, args=(ctx,))
-    #ctx.thread.start()
-    return None
 
-def term(ctx):
-    #ctx.active = False
-    #ctx.thread.join()
+def shutdown():
     if Context.instance:
         Context.instance.active = False
+        Context.instance.thread.join()
 
-def join(ctx, a, b, flags=0, transform=None):
+def join(a, b, flags=0, transform=None):
     link_close = not flags & NOCLOSE
     half_duplex = flags & HALFDUPLEX
 
     if Context.instance is None:
         Context.instance = Context()
 
-    Context.instance.join(a, b, transform, link_close, half_duplex)
+    Context.instance.join_queue.append(
+            (a, b, transform, link_close, half_duplex))
 
-def unjoin(ctx, a, b):
+def unjoin(a, b):
     if Context.instance:
-        Context.instance.unjoin(a, b)
+        Context.instance.unjoin_queue.append((a, b))
 

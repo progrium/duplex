@@ -1,4 +1,4 @@
-# Duplex: Managed Socket API (phase 1)
+# Duplex: Managed Socket API (early phase 1)
 
 Duplex is a library to augment socket programming. It's primary feature
 right now is socket joining. Socket joining makes building fast TCP "plumbing"
@@ -57,7 +57,7 @@ See the examples directory for ideas.
 
 If this works, then we start exposing more kernel tricks (sharing
 sockets across processes, sendfile, splice, tee, etc) and higher level
-functionality into a simple API that looks like BSD sockets v2.
+functionality into a simple API that looks like maybe BSD sockets "v2".
 
 	socket = duplex.Socket()
 	socket.connect("tcp://domain.com:5050")

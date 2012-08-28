@@ -5,3 +5,6 @@ def join(a, b, flags=0, transform=None):
 
 def unjoin(a, b):
     core.unjoin(a, b)
+
+def shutdown():
+    core.shutdown()
