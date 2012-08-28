@@ -27,9 +27,8 @@ import os
 sys.path.append(".")
 sys.path.append("..")
 
-import megasock
+import duplex
 
-ctx = megasock.init()
 
 backend_port = os.environ.get("PORT", 8000)
 
@@ -41,8 +40,8 @@ try:
     while True:
         conn, address = server.accept()
         backend = socket.create_connection(("0.0.0.0", backend_port))
-        megasock.join(ctx, conn, backend)
+        duplex.join(conn, backend)
 finally:
     server.close()
-    megasock.term(ctx)
+    duplex.shutdown()
 

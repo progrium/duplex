@@ -23,15 +23,14 @@ import sys
 sys.path.append(".")
 sys.path.append("..")
 
-import megasock
+import duplex
 
-ctx = megasock.init()
 
 try:
     pair1_left, pair1_right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
     pair2_left, pair2_right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
 
-    megasock.join(ctx, pair1_right, pair2_left)
+    duplex.join(pair1_right, pair2_left)
 
     pair1_left.send("Hello from pair1")
     print "pair2 got:", pair2_right.recv(1024)
@@ -40,5 +39,5 @@ try:
     print "pair1 got:", pair1_left.recv(1024)
 
 finally:
-    megasock.term(ctx)
+    duplex.shutdown()
 

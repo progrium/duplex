@@ -28,14 +28,13 @@ import sys
 sys.path.append(".")
 sys.path.append("..")
 
-import megasock
+import duplex
 
 BACKEND_PORT = 9000
 FRONTEND_PORT = 10000
 
 CLIENT_POOL_SIZE = 3
 
-ctx = megasock.init()
 
 try:
     mode = sys.argv[1]
@@ -70,7 +69,7 @@ try:
                 elif readable == server_frontend:
                     conn, address = readable.accept()
                     backend_conn = waiting_sockets.pop()
-                    megasock.join(ctx, conn, backend_conn)
+                    duplex.join(conn, backend_conn)
                 else:
                     pass
 
@@ -93,7 +92,7 @@ try:
                 # join "activated" connection to local server
                 local_conn = socket.create_connection(("0.0.0.0", local_port))
                 watched_sockets.remove(remote_conn)
-                megasock.join(ctx, remote_conn, local_conn)
+                duplex.join(remote_conn, local_conn)
 
                 # create pending connection to replace it in the pool
                 conn = socket.create_connection(("0.0.0.0", BACKEND_PORT))
@@ -104,4 +103,4 @@ try:
         print "Invalid mode"
 
 finally:
-    megasock.term(ctx)
+    duplex.shutdown()

@@ -35,9 +35,8 @@ import sys
 sys.path.append(".")
 sys.path.append("..")
 
-import megasock
+import duplex
 
-ctx = megasock.init()
 
 connections = []
 
@@ -49,8 +48,8 @@ try:
     while True:
         new_conn, address = server.accept()
         for conn in connections:
-            megasock.join(ctx, new_conn, conn)
+            duplex.join(new_conn, conn)
 finally:
-    megasock.term(ctx)
+    duplex.shutdown()
 
 
