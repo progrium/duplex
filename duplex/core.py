@@ -10,6 +10,8 @@ import select
 import socket
 import os
 
+PUMP_CHUNK_SIZE = 16384 # 16KB
+
 # Flags used in public API
 HALFDUPLEX = 1
 NOCLOSE = 2
@@ -90,7 +92,7 @@ class ManagedSocket(object):
         # This is the part that would be optimized by
         # splice or sendfile
         try:
-            data = self.socket.recv(4096)
+            data = self.socket.recv(PUMP_CHUNK_SIZE)
             if data:
                 for stream in self.streams_out:
                     out = stream.socket_to

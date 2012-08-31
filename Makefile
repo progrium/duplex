@@ -1,0 +1,3 @@
+
+time:
+	./perf/time.sh
