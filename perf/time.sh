@@ -1,3 +1,4 @@
+#!/usr/bin/bash
 cd perf
 pushd .
 echo "Creating 250GB file for throughput timing..."
