@@ -25,19 +25,14 @@ sys.path.append("..")
 
 import duplex
 
+pair1_left, pair1_right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+pair2_left, pair2_right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
 
-try:
-    pair1_left, pair1_right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
-    pair2_left, pair2_right = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+duplex.join(pair1_right, pair2_left)
 
-    duplex.join(pair1_right, pair2_left)
+pair1_left.send("Hello from pair1")
+print "pair2 got:", pair2_right.recv(1024)
 
-    pair1_left.send("Hello from pair1")
-    print "pair2 got:", pair2_right.recv(1024)
-
-    pair2_right.send("Hello from pair2")
-    print "pair1 got:", pair1_left.recv(1024)
-
-finally:
-    duplex.shutdown()
+pair2_right.send("Hello from pair2")
+print "pair1 got:", pair1_left.recv(1024)
 

@@ -41,66 +41,63 @@ try:
 except ValueError:
     mode = None
 
-try:
-    if mode == "--server":
-        server_frontend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_frontend.bind(("0.0.0.0", FRONTEND_PORT))
-        server_frontend.listen(1024)
-        server_frontend.setblocking(0)
+if mode == "--server":
+    server_frontend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_frontend.bind(("0.0.0.0", FRONTEND_PORT))
+    server_frontend.listen(1024)
+    server_frontend.setblocking(0)
 
-        server_backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_backend.bind(("0.0.0.0", BACKEND_PORT))
-        server_backend.listen(1024)
-        server_backend.setblocking(0)
+    server_backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_backend.bind(("0.0.0.0", BACKEND_PORT))
+    server_backend.listen(1024)
+    server_backend.setblocking(0)
 
-        watched_sockets = [server_frontend, server_backend]
-        waiting_sockets = []
+    watched_sockets = [server_frontend, server_backend]
+    waiting_sockets = []
 
-        while True:
-            readables, writables, errs = select.select(
-                                            watched_sockets,
-                                            watched_sockets,
-                                            [], 0)
+    while True:
+        readables, writables, errs = select.select(
+                                        watched_sockets,
+                                        watched_sockets,
+                                        [], 0)
 
-            for readable in readables:
-                if readable == server_backend:
-                    conn, address = readable.accept()
-                    waiting_sockets.append(conn)
-                elif readable == server_frontend:
-                    conn, address = readable.accept()
-                    backend_conn = waiting_sockets.pop()
-                    duplex.join(conn, backend_conn)
-                else:
-                    pass
+        for readable in readables:
+            if readable == server_backend:
+                conn, address = readable.accept()
+                waiting_sockets.append(conn)
+            elif readable == server_frontend:
+                conn, address = readable.accept()
+                backend_conn = waiting_sockets.pop()
+                duplex.join(conn, backend_conn)
+            else:
+                pass
 
-    elif mode == "--client":
-        local_port = sys.argv[2]
-        watched_sockets = []
+elif mode == "--client":
+    local_port = sys.argv[2]
+    watched_sockets = []
 
-        for i in range(CLIENT_POOL_SIZE):
+    for i in range(CLIENT_POOL_SIZE):
+        conn = socket.create_connection(("0.0.0.0", BACKEND_PORT))
+        conn.setblocking(0)
+        watched_sockets.append(conn)
+
+    while True:
+        readables, writables, errs = select.select(
+                                        watched_sockets,
+                                        watched_sockets,
+                                        [], 0)
+
+        for remote_conn in readables:
+            # join "activated" connection to local server
+            local_conn = socket.create_connection(("0.0.0.0", local_port))
+            watched_sockets.remove(remote_conn)
+            duplex.join(remote_conn, local_conn)
+
+            # create pending connection to replace it in the pool
             conn = socket.create_connection(("0.0.0.0", BACKEND_PORT))
             conn.setblocking(0)
             watched_sockets.append(conn)
 
-        while True:
-            readables, writables, errs = select.select(
-                                            watched_sockets,
-                                            watched_sockets,
-                                            [], 0)
+else:
+    print "Invalid mode"
 
-            for remote_conn in readables:
-                # join "activated" connection to local server
-                local_conn = socket.create_connection(("0.0.0.0", local_port))
-                watched_sockets.remove(remote_conn)
-                duplex.join(remote_conn, local_conn)
-
-                # create pending connection to replace it in the pool
-                conn = socket.create_connection(("0.0.0.0", BACKEND_PORT))
-                conn.setblocking(0)
-                watched_sockets.append(conn)
-
-    else:
-        print "Invalid mode"
-
-finally:
-    duplex.shutdown()

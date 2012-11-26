@@ -30,7 +30,7 @@ sys.path.append("..")
 import duplex
 
 
-backend_port = os.environ.get("PORT", 8000)
+backend_port = os.environ.get("PORT", 4000)
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
