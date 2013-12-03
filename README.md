@@ -31,6 +31,8 @@ Duplex is made for RPC, but at its core is actually a powerful system for managi
 
 First of all, Duplex has a concept of a socket like ZeroMQ that is not actually a single TCP socket, but actually a hub of connections. A Duplex socket can both bind to one or more ports listening for connections, or connect out to one or more remote sockets. Like ZeroMQ, Duplex decouples the connection topology from the messaging topology. At the end of the day, a Duplex socket is a peer. 
 
+In addition to bind and connect, an auto method on sockets lets you specify a lazy mechanism to connect to hosts. This lets you tie Duplex into service discovery systems.
+
 ### Channels
 
 So what can you do with these sockets? Once you have a socket with connections, you can open a named channel. A channel consists of three distinct streams: an input stream, an output stream, and an error stream. It's very similar to the Unix pipeline model. When you open a channel on a socket, it will open that channel with one of the peer connections. The selection of the peer is simply round robin. Once a channel is open, all streams on that channel are between you and that peer connection.
@@ -51,7 +53,7 @@ Because Duplex sockets are peers, there is no technical distinction of client or
 
 ### Queues
 
-Lastly, all operations are asynchronous and queued locally in memory just like ZeroMQ. As such, you can start calls before connecting up any peers, or add peers and it automatically balances across them. In addition to bind and connect, an auto method on sockets lets you specify a lazy mechanism to connect to hosts. This lets you tie Duplex into service discovery systems. 
+Lastly, all operations are asynchronous and queued locally in memory just like ZeroMQ. As such, you can start calls before connecting up any peers, or add peers and it automatically balances across them. This gives you quite a bit of flexibility, but it also allows for optimizations such as intelligent batch sends. 
 
 ### Extensibility
 
