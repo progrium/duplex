@@ -1,53 +1,245 @@
 package dpx
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 )
 
+func Reverse(in []byte) []byte {
+	b := make([]byte, len(in))
+	var j int = len(in) - 1
+	for i := 0; i <= j; i++ {
+		b[j-i] = in[i]
+	}
+	return b
+}
+
+type ExamplePayload struct {
+	Message string
+}
+
 func TestQueue(t *testing.T) {
-	q := NewQueue()
+	q := newQueue()
 	q.Enqueue("foo")
 	if q.Dequeue().(string) != "foo" {
 		t.Fatal("dequeued value not foo")
 	}
 }
 
-func TestSocket(t *testing.T) {
-	s1 := Socket()
+func TestPeerFrameSendReceive(t *testing.T) {
+	s1 := NewPeer()
 	if err := Bind(s1, "127.0.0.1:9876"); err != nil {
 		t.Fatal(err)
 	}
-	s2 := Socket()
+	s2 := NewPeer()
 	if err := Connect(s2, "127.0.0.1:9876"); err != nil {
 		t.Fatal(err)
 	}
 
-	openFrame := duplexframe{Type: OpenFrame, Channel: 1, Headers: map[string]string{}, Payload: []byte{}}
-	inputFrame := duplexframe{Type: InputFrame, Channel: 1, Headers: map[string]string{}, Payload: []byte{1, 2, 3}}
+	clientChannel := Open(s1, "foobar")
+	_, serverChannel := Accept(s2)
 
-	debugSend(s1, openFrame)
-	debugSend(s1, inputFrame)
-	got := debugReceive(s2)
-	if got.Type != inputFrame.Type || got.Channel != inputFrame.Channel {
-		t.Fatal("frame not received as sent")
+	if serverChannel.method != clientChannel.method {
+		t.Fatal("channel method not matching", serverChannel.method, clientChannel.method)
 	}
 
-	debugSend(s2, openFrame)
-	debugSend(s2, inputFrame)
-	got = debugReceive(s1)
-	if got.Type != inputFrame.Type || got.Channel != inputFrame.Channel {
-		t.Fatal("frame not received as sent")
+	clientInput := NewFrame(clientChannel)
+	clientInput.Payload = []byte{1, 2, 3}
+	clientInput.Last = true
+	SendFrame(clientChannel, clientInput)
+	serverInput := ReceiveFrame(serverChannel)
+
+	if !bytes.Equal(serverInput.Payload, clientInput.Payload) {
+		t.Fatal("input payloads not matching", serverInput.Payload, clientInput.Payload)
 	}
 
-	s3 := Socket()
-	if err := Connect(s3, "127.0.0.1:9876"); err != nil {
+	serverOutput := NewFrame(serverChannel)
+	serverOutput.Payload = []byte{3, 2, 1}
+	serverOutput.Last = true
+	SendFrame(serverChannel, serverOutput)
+	clientOutput := ReceiveFrame(clientChannel)
+
+	if !bytes.Equal(serverOutput.Payload, clientOutput.Payload) {
+		t.Fatal("output payloads not matching", serverOutput.Payload, clientOutput.Payload)
+	}
+
+	Close(s1)
+	Close(s2)
+
+}
+
+func TestRPCishCallAccept(t *testing.T) {
+	server := NewPeer()
+	if err := Bind(server, "127.0.0.1:9877"); err != nil {
 		t.Fatal(err)
 	}
-	debugSend(s3, openFrame)
-	debugSend(s3, inputFrame)
-	got = debugReceive(s1)
-	if got.Type != inputFrame.Type || got.Channel != inputFrame.Channel {
-		t.Fatal("frame not received as sent")
+	client := NewPeer()
+	if err := Connect(client, "127.0.0.1:9877"); err != nil {
+		t.Fatal(err)
 	}
+
+	go func() {
+		for {
+			method, ch := Accept(server)
+			if ch != nil && method == "foo" {
+				req := ReceiveFrame(ch)
+				resp := NewFrame(ch)
+				resp.Payload = Reverse(req.Payload)
+				SendFrame(ch, resp)
+			}
+		}
+	}()
+
+	resp := Call(client, "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+
+	Close(server)
+	Close(client)
+}
+
+func TestRoundRobinAndAsyncConnect(t *testing.T) {
+	client := NewPeer()
+	if err := Connect(client, "127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Connect(client, "127.0.0.1:9875"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Bind(client, "127.0.0.1:9874"); err != nil {
+		t.Fatal(err)
+	}
+	server1 := NewPeer()
+	if err := Bind(server1, "127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	server2 := NewPeer()
+	if err := Bind(server2, "127.0.0.1:9875"); err != nil {
+		t.Fatal(err)
+	}
+	server3 := NewPeer()
+	if err := Connect(server3, "127.0.0.1:9874"); err != nil {
+		t.Fatal(err)
+	}
+
+	serverResponses := make(chan string, 4)
+	serve := func(s *Peer, id string) {
+		for {
+			method, ch := Accept(s)
+			if ch != nil && method == "foo" {
+				serverResponses <- id
+				req := ReceiveFrame(ch)
+				resp := NewFrame(ch)
+				resp.Payload = Reverse(req.Payload)
+				SendFrame(ch, resp)
+			}
+		}
+	}
+	go serve(server1, "1")
+	go serve(server2, "2")
+	go serve(server3, "3")
+
+	resp1 := Call(client, "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp1, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+	resp2 := Call(client, "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp2, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+	resp3 := Call(client, "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp3, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+	resp4 := Call(client, "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp4, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+
+	responses := ""
+	for i := 0; i < 4; i++ {
+		responses = responses + <-serverResponses
+	}
+	if !strings.Contains(responses, "1") {
+		t.Fatal("server 1 did not get called")
+	}
+	if !strings.Contains(responses, "2") {
+		t.Fatal("server 2 did not get called")
+	}
+	if !strings.Contains(responses, "3") {
+		t.Fatal("server 3 did not get called")
+	}
+
+	Close(server1)
+	Close(server2)
+	Close(server3)
+	Close(client)
+}
+
+func TestAsyncMessaging(t *testing.T) {
+	client := NewPeer()
+	if err := Connect(client, "127.0.0.1:9873"); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := make(chan []byte)
+	go func() {
+		resp <- Call(client, "foo", []byte{1, 2, 3}).([]byte)
+	}()
+
+	server := NewPeer()
+	if err := Bind(server, "127.0.0.1:9873"); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for {
+			method, ch := Accept(server)
+			if ch != nil && method == "foo" {
+				req := ReceiveFrame(ch)
+				resp := NewFrame(ch)
+				resp.Payload = Reverse(req.Payload)
+				SendFrame(ch, resp)
+			}
+		}
+	}()
+
+	if !bytes.Equal(<-resp, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+
+	Close(server)
+	Close(client)
+}
+
+func TestPeerSendReceiveCodec(t *testing.T) {
+	s1 := NewPeer()
+	if err := Bind(s1, "127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	s2 := NewPeer()
+	if err := Connect(s2, "127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+
+	clientChannel := Open(s1, "foobar")
+	_, serverChannel := Accept(s2)
+
+	input := new(ExamplePayload)
+	input.Message = "Hello world"
+	Send(clientChannel, input)
+	output := &ExamplePayload{}
+	err := Receive(serverChannel, output)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	if input.Message != output.Message {
+		t.Fatal("payloads not matching", input.Message, output.Message)
+	}
+
+	Close(s1)
+	Close(s2)
 
 }
