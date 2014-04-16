@@ -435,6 +435,14 @@ func ReceiveFrame(channel *Channel) *Frame {
 func Send(channel *Channel, data interface{}) error {
 	req := NewFrame(channel)
 	Encode(channel, req, data)
+	return SendFrame(channel, req)
+}
+
+func SendLast(channel *Channel, data interface{}) error {
+	req := NewFrame(channel)
+	if data != nil {
+		Encode(channel, req, data)
+	}
 	req.Last = true
 	return SendFrame(channel, req)
 }
@@ -509,10 +517,4 @@ func Register(peer *Peer, method string, doc string, handler *interface{}) {
 func Accept(peer *Peer) (string, *Channel) {
 	ch := peer.accept()
 	return ch.method, ch
-}
-
-func Serve(peer *Peer) error {
-	for {
-
-	}
 }
