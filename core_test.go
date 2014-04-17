@@ -101,9 +101,8 @@ func (t *StreamingArith) Thrive(args StreamingArgs, stream SendStream) error {
 		if i == args.ErrorAt {
 			return errors.New("Triggered error in middle")
 		}
-		select {
-		case stream.Send <- &StreamingReply{C: args.A, Index: i}:
-		case <-stream.Error:
+		err := stream.Send(&StreamingReply{C: args.A, Index: i})
+		if err != nil {
 			return nil
 		}
 	}
@@ -126,7 +125,7 @@ func TestStreamingOutput(t *testing.T) {
 
 	args := &StreamingArgs{3, 5, -1}
 	replyChan := make(chan *StreamingReply, 10)
-	call := client.StreamGo("StreamingArith.Thrive", args, replyChan)
+	call, _ := client.Open("StreamingArith.Thrive", args, replyChan)
 
 	count := 0
 	for reply := range replyChan {

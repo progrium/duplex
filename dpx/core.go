@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -23,15 +24,19 @@ var mh codec.MsgpackHandle
 
 var RetryWaitSec = 1
 
+var CloseStreamErr = "CloseStream"
+
 var peerIndex = 0
 
 // Here is a shitty queue with blocking capabilities.
 // Replace me
 type queue struct {
+	sync.Mutex
 	Q        *lang.Queue
 	ch       chan struct{}
 	draining bool
-	finished bool
+	closed   bool
+	err      error
 }
 
 func newQueue() *queue {
@@ -41,8 +46,10 @@ func newQueue() *queue {
 }
 
 func (q *queue) Enqueue(item interface{}) error {
-	if q.draining {
-		return errors.New("queue already received last")
+	q.Lock()
+	defer q.Unlock()
+	if q.err != nil {
+		return q.err
 	}
 	q.Q.Push(item)
 	q.ch <- struct{}{}
@@ -50,12 +57,38 @@ func (q *queue) Enqueue(item interface{}) error {
 }
 
 func (q *queue) EnqueueLast(item interface{}) (err error) {
-	err = q.Enqueue(item)
+	q.Lock()
+	defer q.Unlock()
+	if q.err != nil {
+		return q.err
+	}
+	q.Q.Push(item)
 	q.draining = true
-	return
+	q.err = errors.New("queue already received last")
+	q.ch <- struct{}{}
+	return nil
+}
+
+func (q *queue) Close() {
+	q.Lock()
+	defer q.Unlock()
+	q.closed = true
+	q.err = errors.New("queue has been closed")
+	q.Q = nil
+}
+
+func (q *queue) Closed() bool {
+	return q.closed
+}
+
+func (q *queue) Draining() bool {
+	return q.draining
 }
 
 func (q *queue) Dequeue() interface{} {
+	if q.closed {
+		return nil
+	}
 	<-q.ch
 	return q.Q.Poll()
 }
@@ -89,8 +122,11 @@ func (c *duplexconn) readFrames() {
 			return
 		}
 		log.Println("Reading frame:", frame)
+		c.Lock()
+		ch, exists := c.channels[frame.Channel]
+		c.Unlock()
 		if frame.Type == OpenFrame {
-			if _, exists := c.channels[frame.Channel]; !exists {
+			if !exists {
 				channel := c.peer.newChannel()
 				channel.server = true
 				channel.id = frame.Channel
@@ -101,9 +137,16 @@ func (c *duplexconn) readFrames() {
 				log.Println("received open frame for channel that already exists")
 			}
 		} else {
-			if ch, exists := c.channels[frame.Channel]; exists {
-				c.Lock()
-				if !ch.incoming.draining {
+			if exists {
+				if frame.Error != "" {
+					log.Println("received error: ", frame.Error)
+					ch.err = errors.New(frame.Error)
+					ch.outgoing.Close()
+					ch.incoming.Close()
+					c.removeChannel(ch)
+					continue
+				}
+				if !ch.incoming.Draining() {
 					ch.incoming.Enqueue(&frame)
 					if frame.Last {
 						ch.incoming.EnqueueLast(nil)
@@ -111,7 +154,6 @@ func (c *duplexconn) readFrames() {
 				} else {
 					log.Println("received frame for channel that is already finished")
 				}
-				c.Unlock()
 			} else {
 				log.Println("received frame for channel that doesn't exist")
 			}
@@ -319,6 +361,7 @@ type Channel struct {
 	incoming *queue
 	outgoing *queue
 	method   string
+	err      error
 }
 
 func (c *Channel) newFrame() *Frame {
@@ -408,6 +451,9 @@ func NewFrame(channel *Channel) *Frame {
 }
 
 func SendFrame(channel *Channel, frame *Frame) error {
+	if channel.err != nil {
+		return channel.err
+	}
 	frame.chanRef = channel
 	frame.Channel = channel.id
 	frame.Type = DataFrame
@@ -420,16 +466,19 @@ func SendFrame(channel *Channel, frame *Frame) error {
 
 // blocks
 func ReceiveFrame(channel *Channel) *Frame {
-	if channel.incoming.finished {
+	if channel.incoming.Closed() {
 		return nil
 	}
-	frame := channel.incoming.Dequeue().(*Frame)
-	if channel.incoming.draining && frame == nil {
-		channel.incoming.finished = true
+	frame := channel.incoming.Dequeue()
+	if channel.incoming.Draining() && frame == nil {
+		channel.incoming.Close()
 		// ok to remove since only affects incoming frames
 		channel.conn.removeChannel(channel)
 	}
-	return frame
+	if frame != nil {
+		return frame.(*Frame)
+	}
+	return nil
 }
 
 func Send(channel *Channel, data interface{}) error {
@@ -455,12 +504,15 @@ func SendErr(channel *Channel, err string) error {
 }
 
 func Receive(channel *Channel, obj interface{}) error {
+	if channel.err != nil {
+		return channel.err
+	}
 	return Decode(channel, ReceiveFrame(channel), obj)
 }
 
 func Decode(ch *Channel, frame *Frame, obj interface{}) error {
-	if frame.Error != "" {
-		return errors.New("remote: " + frame.Error)
+	if frame == nil {
+		return io.EOF
 	}
 	buffer := bytes.NewBuffer(frame.Payload)
 	decoder := codec.NewDecoder(buffer, &mh)
