@@ -7,7 +7,7 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-// This file contains what the public API functions. They would
+// This file contains the public API functions. They would
 // look like dpx_peer, dpx_connect, etc when ported to C (libtask)
 
 var mh codec.MsgpackHandle

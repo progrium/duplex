@@ -63,7 +63,7 @@ func (peer *Peer) Open(method string, input interface{}, output interface{}) (*C
 	call.Done = make(chan *Call, 1) // buffered
 
 	inType := reflect.TypeOf(input)
-	if inType == typeOfSendStream {
+	if inType == reflect.PtrTo(typeOfSendStream) {
 		call.InputStream = input.(*SendStream)
 		call.InputStream.channel = call.channel
 	} else {

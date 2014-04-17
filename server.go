@@ -104,7 +104,11 @@ func newReflectedMethod(method reflect.Method) *reflectedMethod {
 	}
 
 	if channelType != nil {
-		if channelType != typeOfChannel {
+		if channelType.Kind() != reflect.Ptr {
+			log.Println("method", mname, "channel argument not a pointer:", channelType)
+			return nil
+		}
+		if channelType != reflect.PtrTo(typeOfChannel) {
 			log.Println("method", mname, "channel argument is", channelType, "not Channel")
 			return nil
 		}
@@ -151,76 +155,6 @@ func newReflectedMethod(method reflect.Method) *reflectedMethod {
 		OutputType:   outputType,
 		OutputStream: stream,
 		ContextType:  contextType,
-	}
-}
-
-func errVal(returnVals []reflect.Value) (string, bool) {
-	errInter := returnVals[0].Interface()
-	errmsg := ""
-	if errInter != nil {
-		errmsg = errInter.(error).Error()
-	}
-	if errmsg != "" {
-		return errmsg, true
-	}
-	return errmsg, false
-}
-
-func (p *Peer) Serve() {
-	for {
-		method, ch := p.Accept()
-
-		serviceMethod := strings.Split(method, ".")
-		if len(serviceMethod) != 2 {
-			log.Println("duplex: service/method request ill-formed: " + method)
-			continue
-		}
-		p.serviceLock.Lock()
-		service := p.serviceMap[serviceMethod[0]]
-		p.serviceLock.Unlock()
-		if service == nil {
-			log.Println("duplex: can't find service " + method)
-			continue
-		}
-		rmethod := service.method[serviceMethod[1]]
-		if rmethod == nil {
-			log.Println("duplex: can't find method " + method)
-			continue
-		}
-
-		if rmethod.Channel {
-			if errmsg, err := errVal(rmethod.Method.Func.Call([]reflect.Value{reflect.ValueOf(ch)})); err {
-				ch.SendErr(errmsg)
-			} else {
-				ch.SendLast(nil)
-			}
-			continue
-		}
-
-		input := rmethod.NewInput()
-		err := ch.Receive(input)
-		if err != nil {
-			log.Println("duplex: failure receiving " + err.Error())
-			continue
-		}
-
-		contextv := reflect.New(p.contextType) // should optionally be passed in? https://github.com/flynn/rpcplus/blob/master/server.go#L562
-		var output reflect.Value
-		if rmethod.StreamingOuput() {
-			output = reflect.ValueOf(SendStream{ch})
-		} else {
-			output = rmethod.NewOutput()
-		}
-
-		if errmsg, err := errVal(rmethod.Call(service.rcvr, input, output, contextv)); err {
-			ch.SendErr(errmsg)
-		} else {
-			if rmethod.StreamingOuput() {
-				ch.SendLast(nil)
-			} else {
-				ch.SendLast(output.Interface())
-			}
-		}
 	}
 }
 
@@ -278,4 +212,74 @@ func (p *Peer) register(rcvr interface{}, name string, useName bool) error {
 	}
 	p.serviceMap[s.name] = s
 	return nil
+}
+
+func errVal(returnVals []reflect.Value) (string, bool) {
+	errInter := returnVals[0].Interface()
+	errmsg := ""
+	if errInter != nil {
+		errmsg = errInter.(error).Error()
+	}
+	if errmsg != "" {
+		return errmsg, true
+	}
+	return errmsg, false
+}
+
+func (p *Peer) Serve() {
+	for {
+		method, ch := p.Accept()
+
+		serviceMethod := strings.Split(method, ".")
+		if len(serviceMethod) != 2 {
+			log.Println("duplex: service/method request ill-formed: " + method)
+			continue
+		}
+		p.serviceLock.Lock()
+		service := p.serviceMap[serviceMethod[0]]
+		p.serviceLock.Unlock()
+		if service == nil {
+			log.Println("duplex: can't find service " + method)
+			continue
+		}
+		rmethod := service.method[serviceMethod[1]]
+		if rmethod == nil {
+			log.Println("duplex: can't find method " + method)
+			continue
+		}
+
+		if rmethod.Channel {
+			if errmsg, err := errVal(rmethod.Method.Func.Call([]reflect.Value{service.rcvr, reflect.ValueOf(ch)})); err {
+				ch.SendErr(errmsg)
+			} else {
+				ch.SendLast(nil)
+			}
+			continue
+		}
+
+		input := rmethod.NewInput()
+		err := ch.Receive(input)
+		if err != nil {
+			log.Println("duplex: failure receiving " + err.Error())
+			continue
+		}
+
+		contextv := reflect.New(p.contextType) // should optionally be passed in? https://github.com/flynn/rpcplus/blob/master/server.go#L562
+		var output reflect.Value
+		if rmethod.StreamingOuput() {
+			output = reflect.ValueOf(SendStream{ch})
+		} else {
+			output = rmethod.NewOutput()
+		}
+
+		if errmsg, err := errVal(rmethod.Call(service.rcvr, input, output, contextv)); err {
+			ch.SendErr(errmsg)
+		} else {
+			if rmethod.StreamingOuput() {
+				ch.SendLast(nil)
+			} else {
+				ch.SendLast(output.Interface())
+			}
+		}
+	}
 }

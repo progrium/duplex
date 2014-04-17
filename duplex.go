@@ -82,4 +82,8 @@ func (s *SendStream) Send(obj interface{}) error {
 	return s.channel.Send(obj)
 }
 
+func (s *SendStream) SendLast(obj interface{}) error {
+	return s.channel.SendLast(obj)
+}
+
 var typeOfSendStream = reflect.TypeOf(SendStream{})
