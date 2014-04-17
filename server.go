@@ -189,8 +189,8 @@ func (p *Peer) Serve() {
 		}
 
 		if rmethod.Channel {
-			if err, msg := errVal(rmethod.Method.Func.Call([]reflect.Value{reflect.ValueOf(ch)})); err {
-				ch.SendErr(msg)
+			if errmsg, err := errVal(rmethod.Method.Func.Call([]reflect.Value{reflect.ValueOf(ch)})); err {
+				ch.SendErr(errmsg)
 			} else {
 				ch.SendLast(nil)
 			}
