@@ -67,6 +67,12 @@ func (c *Channel) close(err error) {
 	close(c.outgoing)
 }
 
+func (c *Channel) Error() error {
+	c.Lock()
+	defer c.Unlock()
+	return c.err
+}
+
 func (c *Channel) ReceiveFrame() *Frame {
 	if c.server && c.last {
 		return nil

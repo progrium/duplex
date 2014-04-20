@@ -88,8 +88,8 @@ func SendErr(channel *Channel, err string, last bool) error {
 
 // blocks
 func Receive(channel *Channel, obj interface{}) error {
-	if channel.err != nil {
-		return channel.err
+	if err := channel.Error(); err != nil {
+		return err
 	}
 	return Decode(channel, ReceiveFrame(channel), obj)
 }

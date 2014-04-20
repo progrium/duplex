@@ -263,7 +263,7 @@ func (p *Peer) Serve() {
 		input := rmethod.NewInput()
 		err := ch.Receive(input)
 		if err != nil {
-			log.Println("duplex: failure receiving " + err.Error())
+			log.Println("duplex: failure receiving", err)
 			continue
 		}
 

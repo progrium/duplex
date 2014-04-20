@@ -334,9 +334,13 @@ func TestStreamingInputOutput(t *testing.T) {
 	}
 
 	count := 0
+	two := make(chan int)
 	go func() {
 		for reply := range output {
 			count += reply.Index
+			if count == 2 {
+				two <- count
+			}
 		}
 	}()
 
@@ -346,7 +350,7 @@ func TestStreamingInputOutput(t *testing.T) {
 	input.Send(&StreamingArgs{3, 1, 0})
 	input.Send(&StreamingArgs{4, 1, 0})
 
-	if count < 2 {
+	if (<-two) < 2 {
 		t.Fatal("4 messages have been sent but only", count, "have been recieved")
 	}
 	input.SendLast(&StreamingArgs{5, 1, 0})
