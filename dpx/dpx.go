@@ -2,7 +2,9 @@ package dpx
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"log"
 
 	"github.com/ugorji/go/codec"
 )
@@ -10,8 +12,16 @@ import (
 // This file contains the public API functions. They would
 // look like dpx_peer, dpx_connect, etc when ported to C (libtask)
 
-var mh codec.MsgpackHandle
 var CloseStreamErr = "CloseStream"
+
+var mh codec.MsgpackHandle
+var debugMode = true
+
+func debug(v ...interface{}) {
+	if debugMode {
+		log.Println(v...)
+	}
+}
 
 // Peer operations
 
@@ -20,15 +30,15 @@ func NewPeer() *Peer {
 }
 
 func Connect(peer *Peer, addr string) error {
-	return peer.connect(addr)
+	return peer.Connect(addr)
 }
 
 func Bind(peer *Peer, addr string) error {
-	return peer.bind(addr)
+	return peer.Bind(addr)
 }
 
 func Close(peer *Peer) error {
-	return peer.close()
+	return peer.Close()
 }
 
 func Auto(peer *Peer, fn func() []string) error {
@@ -42,60 +52,38 @@ func Codec(peer *Peer, name string, codec interface{}) error {
 // Channel operations
 
 func NewFrame(channel *Channel) *Frame {
-	return channel.newFrame()
+	return newFrame(channel)
 }
 
 func SendFrame(channel *Channel, frame *Frame) error {
-	if channel.err != nil {
-		return channel.err
-	}
-	frame.chanRef = channel
-	frame.Channel = channel.id
-	frame.Type = DataFrame
-	if frame.Last {
-		return channel.outgoing.EnqueueLast(frame)
-	} else {
-		return channel.outgoing.Enqueue(frame)
-	}
+	return channel.SendFrame(frame)
 }
 
 // blocks
 func ReceiveFrame(channel *Channel) *Frame {
-	if channel.incoming.Closed() {
-		return nil
-	}
-	frame := channel.incoming.Dequeue()
-	if channel.incoming.Draining() && frame == nil {
-		channel.incoming.Close()
-		// ok to remove since only affects incoming frames
-		channel.conn.removeChannel(channel)
-	}
-	if frame != nil {
-		return frame.(*Frame)
-	}
-	return nil
+	return channel.ReceiveFrame()
 }
 
 func Send(channel *Channel, data interface{}) error {
-	req := NewFrame(channel)
-	Encode(channel, req, data)
-	return SendFrame(channel, req)
+	frame := newFrame(channel)
+	Encode(channel, frame, data)
+	return SendFrame(channel, frame)
 }
 
 func SendLast(channel *Channel, data interface{}) error {
-	req := NewFrame(channel)
+	frame := newFrame(channel)
 	if data != nil {
-		Encode(channel, req, data)
+		Encode(channel, frame, data)
 	}
-	req.Last = true
-	return SendFrame(channel, req)
+	frame.Last = true
+	return SendFrame(channel, frame)
 }
 
-func SendErr(channel *Channel, err string) error {
-	req := NewFrame(channel)
-	req.Error = err
-	req.Last = true
-	return SendFrame(channel, req)
+func SendErr(channel *Channel, err string, last bool) error {
+	frame := newFrame(channel)
+	frame.Error = err
+	frame.Last = last
+	return SendFrame(channel, frame)
 }
 
 // blocks
@@ -109,6 +97,9 @@ func Receive(channel *Channel, obj interface{}) error {
 func Decode(ch *Channel, frame *Frame, obj interface{}) error {
 	if frame == nil {
 		return io.EOF
+	}
+	if frame.Error != "" {
+		return errors.New(frame.Error)
 	}
 	buffer := bytes.NewBuffer(frame.Payload)
 	decoder := codec.NewDecoder(buffer, &mh)
@@ -129,30 +120,16 @@ func Encode(ch *Channel, frame *Frame, obj interface{}) error {
 // Client operations
 
 func Open(peer *Peer, method string) *Channel {
-	channel := peer.newChannel()
-	channel.method = method
-	frame := channel.newFrame()
-	frame.Type = OpenFrame
-	frame.Method = method
-	peer.routableFrames.Enqueue(frame)
-	return channel
-}
-
-// blocks
-func Call(peer *Peer, method string, arg interface{}) interface{} {
-	ch := Open(peer, method)
-	req := NewFrame(ch)
-	req.Payload = arg.([]byte)
-	req.Last = true
-	SendFrame(ch, req)
-	resp := ReceiveFrame(ch)
-	return resp.Payload
+	return peer.Open(method)
 }
 
 // Server operations
 
 // blocks
 func Accept(peer *Peer) (string, *Channel) {
-	ch := peer.accept()
-	return ch.method, ch
+	ch := peer.Accept()
+	if ch != nil {
+		return ch.Method, ch
+	}
+	return "", nil
 }

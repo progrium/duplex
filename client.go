@@ -1,6 +1,7 @@
 package duplex
 
 import (
+	"errors"
 	"io"
 	"log"
 	"reflect"
@@ -56,8 +57,12 @@ func isChanOfPointers(c interface{}) bool {
 		Open(method string, argStream *SendStream, reply *T2) (*Call, error)
 */
 func (peer *Peer) Open(method string, input interface{}, output interface{}) (*Call, error) {
+	channel := dpx.Open(peer.P, method)
+	if channel == nil {
+		return nil, errors.New("duplex: peer is closed")
+	}
 	call := new(Call)
-	call.channel = &Channel{C: dpx.Open(peer.P, method)}
+	call.channel = &Channel{C: channel}
 	call.peer = peer
 	call.Method = method
 	call.Done = make(chan *Call, 1) // buffered

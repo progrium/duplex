@@ -229,28 +229,31 @@ func errVal(returnVals []reflect.Value) (string, bool) {
 func (p *Peer) Serve() {
 	for {
 		method, ch := p.Accept()
+		if ch == nil {
+			return
+		}
 
 		serviceMethod := strings.Split(method, ".")
 		if len(serviceMethod) != 2 {
-			log.Println("duplex: service/method request ill-formed: " + method)
+			ch.SendErr("duplex: service/method request ill-formed: "+method, true)
 			continue
 		}
 		p.serviceLock.Lock()
 		service := p.serviceMap[serviceMethod[0]]
 		p.serviceLock.Unlock()
 		if service == nil {
-			log.Println("duplex: can't find service " + method)
+			ch.SendErr("duplex: can't find service "+method, true)
 			continue
 		}
 		rmethod := service.method[serviceMethod[1]]
 		if rmethod == nil {
-			log.Println("duplex: can't find method " + method)
+			ch.SendErr("duplex: can't find method "+method, true)
 			continue
 		}
 
 		if rmethod.Channel {
 			if errmsg, err := errVal(rmethod.Method.Func.Call([]reflect.Value{service.rcvr, reflect.ValueOf(ch)})); err {
-				ch.SendErr(errmsg)
+				ch.SendErr(errmsg, true)
 			} else {
 				ch.SendLast(nil)
 			}
@@ -273,7 +276,7 @@ func (p *Peer) Serve() {
 		}
 
 		if errmsg, err := errVal(rmethod.Call(service.rcvr, input, output, contextv)); err {
-			ch.SendErr(errmsg)
+			ch.SendErr(errmsg, true)
 		} else {
 			if rmethod.StreamingOuput() {
 				ch.SendLast(nil)

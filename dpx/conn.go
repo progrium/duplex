@@ -2,16 +2,14 @@ package dpx
 
 import (
 	"bufio"
-	"errors"
-	"log"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/ugorji/go/codec"
 )
 
 var RetryWaitSec = 1
+var RetryAttempts = 20
 
 func receiveGreeting(conn net.Conn) bool {
 	// TODO
@@ -38,60 +36,41 @@ func (c *duplexconn) readFrames() {
 		var frame Frame
 		err := decoder.Decode(&frame)
 		if err != nil {
-			log.Println(err)
+			debug(err)
+			close(c.writeCh)
 			return
 		}
-		log.Println("Reading frame:", frame)
+		debug("Reading frame:", frame)
 		c.Lock()
 		ch, exists := c.channels[frame.Channel]
 		c.Unlock()
-		if frame.Type == OpenFrame {
-			if !exists {
-				channel := c.peer.newChannel()
-				channel.server = true
-				channel.id = frame.Channel
-				channel.method = frame.Method
-				c.addChannel(channel)
-				c.peer.channelQueue.Enqueue(channel)
-			} else {
-				log.Println("received open frame for channel that already exists")
-			}
-		} else {
-			if exists {
-				if frame.Error != "" {
-					log.Println("received error: ", frame.Error)
-					ch.err = errors.New(frame.Error)
-					ch.outgoing.Close()
-					ch.incoming.Close()
-					c.removeChannel(ch)
-					continue
-				}
-				if !ch.incoming.Draining() {
-					ch.incoming.Enqueue(&frame)
-					if frame.Last {
-						ch.incoming.EnqueueLast(nil)
-					}
-				} else {
-					log.Println("received frame for channel that is already finished")
-				}
-			} else {
-				log.Println("received frame for channel that doesn't exist")
+		if exists && frame.Type == DataFrame {
+			if ch.HandleIncoming(&frame) {
+				continue
 			}
 		}
+		if !exists && frame.Type == OpenFrame {
+			if c.peer.HandleOpen(c, &frame) {
+				continue
+			}
+		}
+		debug("Dropped frame:", frame)
 	}
 }
 
 func (c *duplexconn) writeFrames() {
 	encoder := codec.NewEncoder(c.conn, &mh)
 	for {
-		frame := <-c.writeCh
-		log.Println("Writing frame:", frame)
-		err := encoder.Encode(frame)
-		if err != nil {
-			log.Println(err)
+		frame, ok := <-c.writeCh
+		if !ok {
+			return
 		}
+		err := encoder.Encode(frame)
 		frame.errCh <- err
-		log.Println("Done writing")
+		if err != nil {
+			debug(err)
+			return
+		}
 	}
 }
 
@@ -100,87 +79,15 @@ func (c *duplexconn) writeFrame(frame *Frame) error {
 	return <-frame.errCh
 }
 
-func (c *duplexconn) addChannel(ch *Channel) {
+func (c *duplexconn) LinkChannel(ch *Channel) {
 	c.Lock()
 	defer c.Unlock()
 	c.channels[ch.id] = ch
-	ch.conn = c
-	go ch.pumpFrames()
+	ch.connCh <- c
 }
 
-func (c *duplexconn) removeChannel(ch *Channel) {
+func (c *duplexconn) UnlinkChannel(ch *Channel) {
 	c.Lock()
 	defer c.Unlock()
 	delete(c.channels, ch.id)
-}
-
-func (s *Peer) connect(addr string) error {
-	if s.closed {
-		return errors.New("peer is closed")
-	}
-	go func() {
-		for {
-			log.Println(s.index, "Connecting", addr)
-			conn, err := net.Dial("tcp", addr)
-			if err != nil {
-				log.Println(s.index, "Unable to connect, retrying soon...")
-				time.Sleep(time.Duration(RetryWaitSec) * time.Second)
-				continue
-			}
-			if err := sendGreeting(conn); err != nil {
-				log.Println("failed to make greeting")
-				return
-			}
-			log.Println(s.index, "Connected")
-			s.addConnection(conn)
-			return
-		}
-	}()
-	return nil
-}
-
-func (s *Peer) bind(addr string) error {
-	if s.closed {
-		return errors.New("peer is closed")
-	}
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	s.Lock()
-	s.listeners = append(s.listeners, listener)
-	s.Unlock()
-	log.Println(s.index, "Now listening", addr)
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				log.Println(err.Error())
-				return
-			}
-			go func() {
-				if receiveGreeting(conn) {
-					s.addConnection(conn)
-				}
-			}()
-		}
-	}()
-	return nil
-}
-
-func (s *Peer) close() error {
-	s.closed = true
-	s.Lock()
-	defer s.Unlock()
-	for _, listener := range s.listeners {
-		if err := listener.Close(); err != nil {
-			return err
-		}
-	}
-	for _, conn := range s.conns {
-		if err := conn.conn.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

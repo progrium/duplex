@@ -37,7 +37,10 @@ func (p *Peer) Close() error {
 
 func (p *Peer) Accept() (string, *Channel) {
 	method, ch := dpx.Accept(p.P)
-	return method, &Channel{C: ch}
+	if ch != nil {
+		return method, &Channel{C: ch}
+	}
+	return "", nil
 }
 
 type Channel struct {
@@ -52,8 +55,8 @@ func (c *Channel) SendLast(obj interface{}) error {
 	return dpx.SendLast(c.C, obj)
 }
 
-func (c *Channel) SendErr(err string) error {
-	return dpx.SendErr(c.C, err)
+func (c *Channel) SendErr(err string, last bool) error {
+	return dpx.SendErr(c.C, err, last)
 }
 
 func (c *Channel) Receive(obj interface{}) error {
@@ -61,7 +64,7 @@ func (c *Channel) Receive(obj interface{}) error {
 }
 
 func (c *Channel) Close() error {
-	return c.SendErr(dpx.CloseStreamErr)
+	return c.SendErr(dpx.CloseStreamErr, false)
 }
 
 var typeOfChannel = reflect.TypeOf(Channel{})

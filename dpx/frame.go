@@ -20,3 +20,12 @@ type Frame struct {
 	Error   string
 	Last    bool
 }
+
+func newFrame(c *Channel) *Frame {
+	return &Frame{
+		chanRef: c,
+		Channel: c.id,
+		Headers: map[string]string{},
+		errCh:   make(chan error),
+	}
+}
