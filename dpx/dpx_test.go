@@ -15,16 +15,18 @@ func Reverse(in []byte) []byte {
 	return b
 }
 
-type ExamplePayload struct {
-	Message string
+func Call(peer *Peer, method string, arg interface{}) interface{} {
+	ch := Open(peer, method)
+	req := NewFrame(ch)
+	req.Payload = arg.([]byte)
+	req.Last = true
+	SendFrame(ch, req)
+	resp := ReceiveFrame(ch)
+	return resp.Payload
 }
 
-func TestQueue(t *testing.T) {
-	q := newQueue()
-	q.Enqueue("foo")
-	if q.Dequeue().(string) != "foo" {
-		t.Fatal("dequeued value not foo")
-	}
+type ExamplePayload struct {
+	Message string
 }
 
 func TestPeerFrameSendReceive(t *testing.T) {
@@ -40,8 +42,8 @@ func TestPeerFrameSendReceive(t *testing.T) {
 	clientChannel := Open(s1, "foobar")
 	_, serverChannel := Accept(s2)
 
-	if serverChannel.method != clientChannel.method {
-		t.Fatal("channel method not matching", serverChannel.method, clientChannel.method)
+	if serverChannel.Method != clientChannel.Method {
+		t.Fatal("channel method not matching", serverChannel.Method, clientChannel.Method)
 	}
 
 	clientInput := NewFrame(clientChannel)

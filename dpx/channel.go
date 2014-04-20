@@ -73,6 +73,7 @@ func (c *Channel) Error() error {
 	return c.err
 }
 
+// not thread safe because of c.last?
 func (c *Channel) ReceiveFrame() *Frame {
 	if c.server && c.last {
 		return nil
@@ -109,12 +110,12 @@ func (c *Channel) SendFrame(frame *Frame) error {
 
 func (c *Channel) HandleIncoming(frame *Frame) bool {
 	c.Lock()
+	defer c.Unlock()
 	if c.closed {
 		return false
 	}
-	c.Unlock()
 	if !frame.Last && frame.Error != "" {
-		c.close(errors.New(frame.Error))
+		go c.close(errors.New(frame.Error))
 		return true
 	}
 	c.incoming <- frame

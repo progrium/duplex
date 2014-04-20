@@ -101,20 +101,15 @@ func (p *Peer) Open(method string) *Channel {
 
 func (p *Peer) HandleOpen(conn *duplexconn, frame *Frame) bool {
 	p.Lock()
+	defer p.Unlock()
 	if p.closed {
 		return false
 	}
-	p.Unlock()
 	p.incomingChannels <- newServerChannel(conn, frame)
 	return true
 }
 
 func (p *Peer) Accept() *Channel {
-	p.Lock()
-	if p.closed {
-		return nil
-	}
-	p.Unlock()
 	channel, ok := <-p.incomingChannels
 	if !ok {
 		return nil

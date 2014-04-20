@@ -15,10 +15,10 @@ type Frame struct {
 
 	Method  string
 	Headers map[string]string
-
-	Payload []byte
 	Error   string
 	Last    bool
+
+	Payload []byte
 }
 
 func newFrame(c *Channel) *Frame {
