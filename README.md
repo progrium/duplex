@@ -1,22 +1,31 @@
-# Duplex Prototype
+# Duplex 
 
 Duplex is a simple, efficient, extensible application communications protocol and library. It's heavily inspired by ZeroMQ and BERT-RPC, but draws influence from Twitter Finagle, HTTP/2, zerorpc, and Unix pipes.
 
-Here are some novel features of Duplex RPC:
- * Built around message streams for RPC input (arguments), output (return value)
- * Payload agnostic. Serialize data however you like, or with the default codecs
- * ZeroMQ-style async "sockets" called Peers that aggregate connections, queue messages, round robin, etc
+Currently for #golang, the core (dpx) is intended to be rewritten in C using libtask to make it available to most other languages. 
+
+## Features
+
+ * Does efficient RPC, but also supports streaming output (return values) *and* streaming input
+ * Intended to be payload agnostic, supporting both dynamic and static systems. Currently just msgpack.
+ * Client and server are the same library exposed as async "Peer" objects
+ * Peer objects have built-in connection pool and message queue (like ZeroMQ sockets)
+ 
+In short, Duplex is intended to be a language/serialization agnostic RPC and service-oriented communications layer. It's designed for [brokerless messaging architectures](http://zeromq.org/whitepapers:brokerless) and borrows much of the edge-oriented messaging philosophy of ZeroMQ for scalable, distributed deployments.
+
+## Why not ZeroMQ?
 
 Although heavily inpsired by ZeroMQ and nanomsg, here are reasons it doesn't use either:
+
  * Stream-oriented request/reply cannot be achieved without multiple socket types, each on their own port
  * Message patterns would be implemented at a higher level, making most socket types useless here
  * No ability to reverse REQ/REP roles (say, for callbacks) without new sockets on new ports
+ * Writing multiplexing on top of ZeroMQ adds complexity and mostly ignores its messaging patterns (as seen in zerorpc)
 
-In short, the messaging abstractions work against the goals of Duplex. However there are many great features that Duplex emulates, mostly to employ the overall "smart application/edge, dumb switch/network" messaging philosophy, such as building in connection pools, reconnect logic, edge queuing, and optimizing for high-throughput usage.
+In short, the messaging abstractions work against the goals of Duplex. However there are many great features that Duplex emulates, mostly to employ the overall distributed / edge messaging philosophy, and building in connection pools, reconnect logic, edge queuing, and optimizing for high-throughput async usage.
 
-Then combine this with the powerful RPC semantics of BERT-RPC, built around a Unix-inpsired "stream model", and package it in a well-defined C library ready for easy bindings in your favorite language... then you have a powerful communications primitive for service-oriented systems. 
+## Roadmap
 
-The roadmap of this early project looks like this:
  * Prototype in Go
  * Validate by using in Flynn components
  * Document protocols
@@ -35,7 +44,7 @@ In addition to bind and connect, an auto method on sockets lets you specify a la
 
 ### Channels
 
-Once you have a peer with connections, you can open a named channel. A channel encapsulates two streams: an input stream and an output stream. It's very similar to the Unix pipeline model. When you open a channel on a peer, it will open that channel with one of the remote peer connections. The selection of the peer is simply round robin. Once a channel is open, all streams on that channel are between you and that peer connection.
+Once you have a peer with connections, you can open a named channel. A channel encapsulates two streams: an input stream and an output stream. It's very similar to the Unix pipeline model. When you open a channel on a peer, it will open that channel with one of the remote peer connections. The selection of the peer if there is more than one connected is simply round robin. Once a channel is open, all streams on that channel are between you and that peer connection.
 
 ### Streams
 

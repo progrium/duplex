@@ -41,10 +41,6 @@ func Close(peer *Peer) error {
 	return peer.Close()
 }
 
-func Auto(peer *Peer, fn func() []string) error {
-	return nil // TODO
-}
-
 func Codec(peer *Peer, name string, codec interface{}) error {
 	return nil // TODO
 }
