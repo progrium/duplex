@@ -10,7 +10,7 @@ all: $(SHARED) $(STATIC)
 $(OFILES): channel.o conn.o dpx.o frame.o peer.o
 
 CC=gcc
-CFLAGS=-Wall -I. -ggdb -ltask
+CFLAGS=-Wall -I. -ggdb -ltask -lmsgpack
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $*.c

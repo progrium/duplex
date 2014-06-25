@@ -193,7 +193,7 @@ void dpx_channel_pump_outgoing(dpx_channel *c) {
 		int hasFrame = channbrecv(c->outgoing, frame);
 		if (hasFrame != -1) {
 			while(1) {
-				printf("(%d) Sending frame: %s\n", c->peer->index, frame->payload);
+				printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
 				DPX_ERROR err = dpx_duplex_conn_write_frame(c->conn, frame);
 				if (err) {
 					printf("(%d) Error sending frame: %d\n", err);

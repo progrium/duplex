@@ -2,18 +2,23 @@
 
 void dpx_frame_free(dpx_frame *frame) {
 	chanfree(frame->errCh);
+	free(frame->method);
+	free(frame->error);
+	HASH_CLEAR(hh, frame->headers);
 	free(frame);
 }
 
 dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	dpx_frame *frame = (dpx_frame*) malloc(sizeof(dpx_frame));
 
-	frame->_struct = 0;
 	frame->errCh = chancreate(sizeof(DPX_ERROR), 0);
 	frame->chanRef = ch;
 
 	frame->type = 0;
-	frame->channel = ch->id;
+	if (ch != NULL)
+		frame->channel = ch->id;
+	else
+		frame->channel = DPX_FRAME_NOCH;
 
 	frame->method = NULL;
 	frame->headers = NULL;
@@ -21,6 +26,7 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	frame->last = 0;
 
 	frame->payload = NULL;
+	frame->payloadSize = 0;
 
 	return frame;
 }
