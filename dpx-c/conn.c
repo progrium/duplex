@@ -1,6 +1,35 @@
 #include "dpx-c.h"
 #include <string.h>
 
+dpx_duplex_conn* dpx_duplex_conn_new(dpx_peer *p, int fd) {
+	dpx_duplex_conn* c = (dpx_duplex_conn*) malloc(sizeof(dpx_duplex_conn));
+
+	c->lock = (QLock*) calloc(sizeof(QLock));
+	c->peer = p;
+	c->connfd = fd;
+	c->writeCh = chancreate(sizeof(dpx_frame), 0);
+	c->channels = NULL;
+
+	return c;
+}
+
+void dpx_duplex_conn_close(dpx_duplex_conn *c) {
+	close(c->connfd);
+}
+
+void dpx_duplex_conn_free(dpx_duplex_conn *c) {
+	free(c->lock);
+	chanfree(c->writeCh);
+
+	dpx_channel_map *current, *tmp;
+	HASH_ITER(hh, frame->channels, current, tmp) {
+		HASH_DEL(frame->channels, current);
+		free(current);
+	}
+
+	free(c);
+}
+
 void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 	// FIXME make sure conn is open (see libtask netaccept and fdopen())
 
