@@ -20,53 +20,8 @@ void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 		while (msgpack_unpacker_next(&unpacker, &result)) {
 			// result is here!
 			msgpack_object obj = result.data;
-			msgpack_object_array arr = obj.via.array;
-			// create frame
-			dpx_frame* frame = dpx_frame_new(NULL);
 
-			msgpack_object* o = arr.ptr;
-			frame->type = o.via.i64;
-			o++;
-
-			frame->channel = o.via.i64;
-			o++;
-
-			char* methodBuf = (char*) malloc(o.via.raw.size+1);
-			strncpy(o.via.raw.ptr, methodBuf, o.via.raw.size);
-			*(methodBuf + o.via.raw.size) = '\0';
-			frame->method = methodBuf;
-			o++;
-
-			msgpack_object_map headers_map = o.via.map;
-			uint32_t headers_map_size = o.via.map.size;
-			msgpack_object_kv* headers = o.via.map.ptr;
-			o++;
-			// go through kv and add to hashtable
-
-			int i;
-
-			for (i=0; i<headers_map_size; i++) {
-				dpx_header_map* header = (dpx_header_map*) malloc(sizeof(dpx_header_map));
-				strcpy(headers->key->via->raw->ptr, header->key);
-				strcpy(headers->val->via->raw->ptr, header->value);
-				HASH_ADD_KEYPTR(hh, frame->headers, header->key, strlen(header->key), header);
-				headers++;
-			}
-
-			char* errorBuf = (char*) malloc(o.via.raw.size+1);
-			strncpy(o.via.raw, errorBuf, o.via.raw.size);
-			*(errorBuf + o.via.raw.size) = '\0';
-			frame->error = errorBuf;
-			o++;
-
-			frame->last = o.via.i64;
-			o++;
-
-			char* payloadBuf = (char*) malloc(o.via.raw.size);
-			strncpy(o.via.raw, payloadBuf, o.via.raw.size);
-			frame->payload = payloadBuf;
-
-			frame->payloadSize = o.via.raw.size;
+			dpx_frame* frame = dpx_frame_msgpack_from(&obj);
 
 			// got the frame, now save it.
 			qlock(c->lock);
@@ -89,4 +44,51 @@ void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 	}
 
 	// FIXME close(c.writeCh)
+}
+
+void dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
+	while(1) {
+		if (c->writeCh == NULL)
+			return;
+
+		dpx_frame* frame;
+		if (!chanrecv(c->writeCh, frame))
+			return;
+
+		msgpack_sbuffer* encoded = dpx_frame_msgpack_to(frame);
+		int result = fdwrite(c->connfd, encoded->data, encoded->size);
+
+		if (result < 0) {
+			chansendul(frame->errCh, DPX_ERROR_NETWORK_FAIL);
+			printf("Sending frame failed due to system error: %d bytes\n", encoded->size);
+			return;
+		} else if (result != encoded->size) {
+			chansendul(frame->errCh, DPX_ERROR_NETWORK_NOTALL);
+			printf("Sending frame failed because not all bytes were sent: %d/%d bytes\n", result, encoded->size);
+			return;
+		} else {
+			chansendul(frame->errCh, DPX_ERROR_NONE);
+		}
+	}
+}
+
+DPX_ERROR dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
+	chansend(c->writeCh, frame);
+	return chanrecvul(frame->errCh);
+}
+
+void dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
+	qlock(c->lock);
+	dpx_channel_map* ifany = HASH_REPLACE_INT(c->channels, key, c);
+	if (ifany != NULL)
+		free(ifany);
+
+	chansend(ch->connCh, c);
+	qunlock(c->lock);
+}
+
+void dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
+	qlock(c->lock);
+	HASH_DEL(c->channels, ch);
+	qunlock(c->lock);
 }

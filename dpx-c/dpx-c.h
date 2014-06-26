@@ -5,6 +5,9 @@
 
 #include "uthash.h"
 
+//#define NDEBUG
+#include <assert.h>
+
 // ------------------------------- { constants } ------------------------------
 #define DPX_TASK_STACK_SIZE 65536
 
@@ -13,9 +16,13 @@
 #define DPX_ERROR_FATAL -50
 #define DPX_ERROR unsigned long
 
-#define DPX_ERROR_FREEING -10
-#define DPX_ERROR_CHAN_CLOSED -20
-#define DPX_ERROR_CHAN_FRAME -30
+#define DPX_ERROR_FREEING 1
+
+#define DPX_ERROR_CHAN_CLOSED 10
+#define DPX_ERROR_CHAN_FRAME 11
+
+#define DPX_ERROR_NETWORK_FAIL 20
+#define DPX_ERROR_NETWORK_NOTALL 21
 
 // ------------------------- { forward declarations } -------------------------
 
@@ -55,6 +62,8 @@ void dpx_channel_pump_outgoing(dpx_channel *c);
 #define DPX_FRAME_DATA 1
 #define DPX_FRAME_NOCH -1
 
+#define DPX_PACK_ARRAY_SIZE 7
+
 struct _dpx_header_map {
 	char* key;
 	char* value;
@@ -84,6 +93,9 @@ typedef struct _dpx_frame dpx_frame;
 void dpx_frame_free(dpx_frame *frame);
 dpx_frame* dpx_frame_new(dpx_channel *ch);
 
+dpx_frame* dpx_frame_msgpack_from(msgpack_object *obj);
+msgpack_sbuffer* dpx_frame_msgpack_to(dpx_frame *frame);
+
 // -------------------------- { duplex connection } ---------------------------
 #define DPX_DUPLEX_CONN_CHUNK 8192
 #define DPX_DUPLEX_CONN_BUFFER 65536
@@ -105,3 +117,9 @@ struct _dpx_duplex_conn {
 };
 
 typedef struct _dpx_duplex_conn dpx_duplex_conn;
+
+void dpx_duplex_conn_read_frames(dpx_duplex_conn *c);
+void dpx_duplex_conn_write_frames(dpx_duplex_conn *c);
+DPX_ERROR dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame);
+void dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch);
+void dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch);

@@ -26,6 +26,7 @@ dpx_channel* _dpx_channel_new() {
 
 void dpx_channel_free(dpx_channel* c) {
 	dpx_channel_close(c, DPX_ERROR_FREEING);
+	free(ptr->lock);
 	free(c);
 }
 
