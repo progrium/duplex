@@ -4,32 +4,32 @@ int dpx_peer_index = 0;
 char byte = '\r';
 
 void dpx_peer_free(dpx_peer *p) {
-	free(peer->lock);
+	free(p->lock);
 
-	dpx_peer_listener *l, *next;
-	for (l=p->listeners; l != NULL; l=next) {
-		next = l->next;
+	dpx_peer_listener *l, *nl;
+	for (l=p->listeners; l != NULL; l=nl) {
+		nl = l->next;
 		free(l);
 	}
 
-	dpx_peer_connection *c, *next;
-	for (c=p->conns; c != NULL; c=next) {
-		next = c->next;
+	dpx_peer_connection *c, *nc;
+	for (c=p->conns; c != NULL; c=nc) {
+		nc = c->next;
 		free(c);
 	}
 
-	if (peer->openFrames != NULL)
-		chanfree(peer->openFrames);
-	if (peer->incomingChannels != NULL)
-		chanfree(peer->incomingChannels);
-	chanfree(peer->firstConn);
+	if (p->openFrames != NULL)
+		chanfree(p->openFrames);
+	if (p->incomingChannels != NULL)
+		chanfree(p->incomingChannels);
+	chanfree(p->firstConn);
 	free(p);
 }
 
 dpx_peer* dpx_peer_new() {
 	dpx_peer* peer = (dpx_peer*) malloc(sizeof(dpx_peer));
 
-	peer->lock = (QLock*) calloc(sizeof(QLock));
+	peer->lock = (QLock*) calloc(1, sizeof(QLock));
 
 	peer->listeners = NULL;
 	peer->conns = NULL;
@@ -212,27 +212,6 @@ struct _dpx_peer_connect_task_param {
 	int port;
 };
 
-DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port) {
-	qlock(p->lock);
-	DPX_ERROR ret = DPX_ERROR_NONE;
-
-	if (p->closed) {
-		ret = DPX_ERROR_PEER_ALREADYCLOSED;
-		goto dpx_peer_connect_cleanup;
-	}
-
-	struct _dpx_peer_connect_task_param *param = (struct _dpx_peer_connect_task_param*) malloc(sizeof(struct _dpx_peer_connect_task_param));
-	param->p = p;
-	param->addr = addr;
-	param->port = port;
-
-	taskcreate(&_dpx_peer_connect_task, param, DPX_TASK_STACK_SIZE);
-
-dpx_peer_connect_cleanup:
-	qunlock(p->lock);
-	return ret;
-}
-
 DPX_ERROR _dpx_peer_send_greeting(int connfd) {
 	// TODO
 	return DPX_ERROR_NONE;
@@ -271,6 +250,61 @@ _dpx_peer_connect_task_cleanup:
 	free(param);
 }
 
+DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port) {
+	qlock(p->lock);
+	DPX_ERROR ret = DPX_ERROR_NONE;
+
+	if (p->closed) {
+		ret = DPX_ERROR_PEER_ALREADYCLOSED;
+		goto dpx_peer_connect_cleanup;
+	}
+
+	struct _dpx_peer_connect_task_param *param = (struct _dpx_peer_connect_task_param*) malloc(sizeof(struct _dpx_peer_connect_task_param));
+	param->p = p;
+	param->addr = addr;
+	param->port = port;
+
+	taskcreate(&_dpx_peer_connect_task, param, DPX_TASK_STACK_SIZE);
+
+dpx_peer_connect_cleanup:
+	qunlock(p->lock);
+	return ret;
+}
+
+struct _dpx_peer_bind_task_param {
+	dpx_peer *p;
+	int connfd;
+};
+
+void _dpx_peer_bind_task_accept(struct _dpx_peer_bind_task_param *param) {
+	if (_dpx_peer_receive_greeting(param->connfd)) {
+		dpx_peer_accept_connection(param->p, param->connfd);
+	}
+
+	free(param);
+}
+
+void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
+	dpx_peer *p = param->p;
+	int connfd = param->connfd;
+
+	while(1) {
+		char server[16];
+		int port;
+		int fd = netaccept(connfd, server, &port);
+		if (fd < 0) {
+			printf("failed to receive connection...\n");
+			break;
+		}
+		printf("accepted connection from %.*s:%d\n", 16, server, port);
+		struct _dpx_peer_bind_task_param *ap = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
+		ap->p = p;
+		ap->connfd = fd;
+		taskcreate(&_dpx_peer_bind_task_accept, ap, DPX_TASK_STACK_SIZE);
+	}
+
+	free(param);
+}
 
 DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 	qlock(p->lock);
@@ -311,39 +345,4 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 dpx_peer_bind_cleanup:
 	qunlock(p->lock);
 	return ret;
-}
-
-struct _dpx_peer_bind_task_param {
-	dpx_peer *p;
-	int connfd;
-};
-
-void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
-	dpx_peer *p = param->p;
-	int connfd = param->connfd;
-
-	while(1) {
-		char server[16];
-		int port;
-		int fd = netaccept(connfd, server, &port);
-		if (fd < 0) {
-			printf("failed to receive connection...\n");
-			break;
-		}
-		printf("accepted connection from %.*s:%d\n", 16, server, port);
-		struct _dpx_peer_bind_task_param *ap = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
-		ap->p = p;
-		ap->connfd = fd;
-		taskcreate(&_dpx_peer_bind_task_accept, ap, DPX_TASK_STACK_SIZE);
-	}
-
-	free(param);
-}
-
-void _dpx_peer_bind_task_accept(struct _dpx_peer_bind_task_param *param) {
-	if (_dpx_peer_receive_greeting(param->connfd)) {
-		dpx_peer_accept_connection(param->p, param->connfd);
-	}
-
-	free(param);
 }

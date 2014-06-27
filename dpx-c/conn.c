@@ -4,7 +4,7 @@
 dpx_duplex_conn* dpx_duplex_conn_new(dpx_peer *p, int fd) {
 	dpx_duplex_conn* c = (dpx_duplex_conn*) malloc(sizeof(dpx_duplex_conn));
 
-	c->lock = (QLock*) calloc(sizeof(QLock));
+	c->lock = (QLock*) calloc(1, sizeof(QLock));
 	c->peer = p;
 	c->connfd = fd;
 	c->writeCh = chancreate(sizeof(dpx_frame), 0);
@@ -22,8 +22,8 @@ void dpx_duplex_conn_free(dpx_duplex_conn *c) {
 	chanfree(c->writeCh);
 
 	dpx_channel_map *current, *tmp;
-	HASH_ITER(hh, frame->channels, current, tmp) {
-		HASH_DEL(frame->channels, current);
+	HASH_ITER(hh, c->channels, current, tmp) {
+		HASH_DEL(c->channels, current);
 		free(current);
 	}
 
@@ -64,7 +64,7 @@ void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 					continue;
 			}
 			if (channel == NULL && frame->type == DPX_FRAME_OPEN) {
-				if (dpx_peer_handle_open(c->peer, frame))
+				if (dpx_peer_handle_open(c->peer, c, frame))
 					continue;
 			}
 			printf("dropped frame, size %d", frame->payloadSize);
@@ -81,7 +81,7 @@ void dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 			return;
 
 		dpx_frame* frame;
-		if (!chanrecv(c->writeCh, frame))
+		if (!chanrecv(c->writeCh, &frame))
 			return;
 
 		msgpack_sbuffer* encoded = dpx_frame_msgpack_to(frame);
@@ -108,9 +108,14 @@ DPX_ERROR dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
 
 void dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	qlock(c->lock);
-	dpx_channel_map* ifany = HASH_REPLACE_INT(c->channels, key, c);
-	if (ifany != NULL)
-		free(ifany);
+	dpx_channel_map *insert = (dpx_channel_map*) malloc(sizeof(dpx_channel_map));
+	insert->key = ch->id;
+	insert->value = ch;
+
+	dpx_channel_map *old;
+	HASH_REPLACE_INT(c->channels, key, insert, old);
+	if (old != NULL)
+		free(old);
 
 	chansend(ch->connCh, c);
 	qunlock(c->lock);
@@ -118,6 +123,12 @@ void dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 
 void dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	qlock(c->lock);
-	HASH_DEL(c->channels, ch);
+	dpx_channel_map *m;
+
+    HASH_FIND_INT(c->channels, &ch->id, m);
+
+    if (m != NULL)
+		HASH_DEL(c->channels, m);
+
 	qunlock(c->lock);
 }

@@ -44,38 +44,34 @@ dpx_frame* dpx_frame_msgpack_from(msgpack_object *obj) {
 	dpx_frame* frame = dpx_frame_new(NULL);
 
 	msgpack_object* o = arr.ptr;
-	frame->type = o.via.i64;
-	o++;
 
-	frame->channel = o.via.i64;
-	o++;
+	frame->type = o[0].via.i64;
 
-	char* methodBuf = (char*) malloc(o.via.raw.size+1);
-	strncpy(o.via.raw.ptr, methodBuf, o.via.raw.size);
-	*(methodBuf + o.via.raw.size) = '\0';
+	frame->channel = o[1].via.i64;
+
+	msgpack_object_raw methodRaw = o[2].via.raw;
+	char* methodBuf = (char*) malloc(methodRaw.size+1);
+	strncpy(methodBuf, methodRaw.ptr, methodRaw.size);
+	*(methodBuf + methodRaw.size) = '\0';
 	frame->method = methodBuf;
-	o++;
 
-	msgpack_object_map headers_map = o.via.map;
-	uint32_t headers_map_size = o.via.map.size;
-	msgpack_object_kv* headers = o.via.map.ptr;
-	o++;
+	msgpack_object_map headers_map = o[3].via.map;
+	msgpack_object_kv* headers = headers_map.ptr;
+
 	// go through kv and add to hashtable
-
 	int i;
-
-	for (i=0; i<headers_map_size; i++) {
+	for (i=0; i<headers_map.size; i++) {
 		dpx_header_map* header = (dpx_header_map*) malloc(sizeof(dpx_header_map));
 
-		msgpack_object_raw rawKey = headers->key.via.raw;
+		msgpack_object_raw rawKey = headers[i].key.via.raw;
 		char* keyBuf = (char*) malloc(rawKey.size+1);
-		strncpy(rawKey.ptr, keyBuf, rawKey.size);
+		strncpy(keyBuf, rawKey.ptr, rawKey.size);
 		*(keyBuf+rawKey.size) = '\0';
 		header->key = keyBuf;
 
-		msgpack_object_raw rawValue = headers->val.via.raw;
+		msgpack_object_raw rawValue = headers[i].val.via.raw;
 		char* valBuf = (char*) malloc(rawValue.size+1);
-		strncpy(rawValue.ptr, valBuf, rawValue.size);
+		strncpy(valBuf, rawValue.ptr, rawValue.size);
 		*(valBuf+rawValue.size) = '\0';
 		header->value = valBuf;
 		
@@ -83,20 +79,20 @@ dpx_frame* dpx_frame_msgpack_from(msgpack_object *obj) {
 		headers++;
 	}
 
-	char* errorBuf = (char*) malloc(o.via.raw.size+1);
-	strncpy(o.via.raw.ptr, errorBuf, o.via.raw.size);
-	*(errorBuf + o.via.raw.size) = '\0';
+	msgpack_object_raw errorRaw = o[4].via.raw;
+	char* errorBuf = (char*) malloc(errorRaw.size+1);
+	strncpy(errorBuf, errorRaw.ptr, errorRaw.size);
+	*(errorBuf + errorRaw.size) = '\0';
 	frame->error = errorBuf;
-	o++;
 
-	frame->last = o.via.i64;
-	o++;
+	frame->last = o[5].via.i64;
 
-	char* payloadBuf = (char*) malloc(o.via.raw.size);
-	strncpy(o.via.raw.ptr, payloadBuf, o.via.raw.size);
+	msgpack_object_raw payloadRaw = o[6].via.raw;
+	char* payloadBuf = (char*) malloc(payloadRaw.size);
+	strncpy(payloadBuf, payloadRaw.ptr, payloadRaw.size);
 	frame->payload = payloadBuf;
 
-	frame->payloadSize = o.via.raw.size;
+	frame->payloadSize = payloadRaw.size;
 	
 	return frame;
 }
@@ -107,7 +103,7 @@ msgpack_sbuffer* dpx_frame_msgpack_to(dpx_frame *frame) {
 
 	msgpack_pack_array(pack, DPX_PACK_ARRAY_SIZE);
 	msgpack_pack_int(pack, frame->type);
-	msgpack_pack_channel(pack, frame->channel);
+	msgpack_pack_int(pack, frame->channel);
 
 	msgpack_pack_raw(pack, strlen(frame->method));
 	msgpack_pack_raw_body(pack, frame->method, strlen(frame->method));
@@ -126,7 +122,7 @@ msgpack_sbuffer* dpx_frame_msgpack_to(dpx_frame *frame) {
 	msgpack_pack_raw(pack, strlen(frame->error));
 	msgpack_pack_raw_body(pack, frame->error, strlen(frame->error));
 
-	msgpack_pack_int(frame->last);
+	msgpack_pack_int(pack, frame->last);
 
 	msgpack_pack_raw(pack, frame->payloadSize);
 	msgpack_pack_raw_body(pack, frame->payload, frame->payloadSize);

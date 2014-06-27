@@ -4,7 +4,7 @@
 dpx_channel* _dpx_channel_new() {
 	dpx_channel* ptr = (dpx_channel*) malloc(sizeof(dpx_channel));
 
-	ptr->lock = (QLock*) calloc(sizeof(QLock));
+	ptr->lock = (QLock*) calloc(1, sizeof(QLock));
 	ptr->id = 0;
 
 	ptr->peer = NULL;
@@ -26,7 +26,7 @@ dpx_channel* _dpx_channel_new() {
 
 void dpx_channel_free(dpx_channel* c) {
 	dpx_channel_close(c, DPX_ERROR_FREEING);
-	free(ptr->lock);
+	free(c->lock);
 	free(c);
 }
 
@@ -166,12 +166,11 @@ int dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
 	ret = 1;
 
 dpx_channel_handle_incoming_cleanup:
-	qunlock(c->unlock);
+	qunlock(c->lock);
 	return ret;
 }
 
 void dpx_channel_pump_outgoing(dpx_channel *c) {
-	int stillopen = 0;
 	chanrecv(c->connCh, c->conn);
 	printf("(%d) Pumping started for channel %d\n", c->peer->index, c->id);
 	while(1) {
@@ -182,7 +181,7 @@ void dpx_channel_pump_outgoing(dpx_channel *c) {
 			goto dpx_channel_pump_outgoing_cleanup;
 		}
 		dpx_duplex_conn* conn;
-		int hasConn = channbrecv(c->connCh, conn);
+		int hasConn = channbrecv(c->connCh, &conn);
 		if (hasConn != -1) {
 			c->conn = conn;
 		}
@@ -191,7 +190,7 @@ void dpx_channel_pump_outgoing(dpx_channel *c) {
 		if (c->outgoing == NULL) {
 			goto dpx_channel_pump_outgoing_cleanup;
 		}
-		int hasFrame = channbrecv(c->outgoing, frame);
+		int hasFrame = channbrecv(c->outgoing, &frame);
 		if (hasFrame != -1) {
 			while(1) {
 				printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
@@ -207,12 +206,12 @@ void dpx_channel_pump_outgoing(dpx_channel *c) {
 					}
 
 					chanrecv(c->connCh, c->conn);
-					continue
+					continue;
 				}
 				if (strcmp(frame->error, "")) {
-					dpx_channel_close(DPX_ERROR_CHAN_FRAME);
+					dpx_channel_close(c, DPX_ERROR_CHAN_FRAME);
 				} else if (frame->last && c->server) {
-					dpx_channel_close(DPX_ERROR_NONE);
+					dpx_channel_close(c, DPX_ERROR_NONE);
 				}
 				break;
 			}
