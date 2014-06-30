@@ -10,6 +10,8 @@ dpx_duplex_conn* dpx_duplex_conn_new(dpx_peer *p, int fd) {
 	c->writeCh = chancreate(sizeof(dpx_frame), 0);
 	c->channels = NULL;
 
+	fdnoblock(c->connfd);
+
 	return c;
 }
 
