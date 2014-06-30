@@ -64,8 +64,10 @@ void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 					continue;
 			}
 			if (channel == NULL && frame->type == DPX_FRAME_OPEN) {
-				if (dpx_peer_handle_open(c->peer, c, frame))
+				if (dpx_peer_handle_open(c->peer, c, frame)) {
+					dpx_frame_free(frame);
 					continue;
+				}
 			}
 			printf("dropped frame, size %d", frame->payloadSize);
 			dpx_frame_free(frame);
@@ -89,11 +91,11 @@ void dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 
 		if (result < 0) {
 			chansendul(frame->errCh, DPX_ERROR_NETWORK_FAIL);
-			printf("Sending frame failed due to system error: %d bytes\n", encoded->size);
+			printf("Sending frame failed due to system error: %zu bytes\n", encoded->size);
 			return;
 		} else if (result != encoded->size) {
 			chansendul(frame->errCh, DPX_ERROR_NETWORK_NOTALL);
-			printf("Sending frame failed because not all bytes were sent: %d/%d bytes\n", result, encoded->size);
+			printf("Sending frame failed because not all bytes were sent: %d/%zu bytes\n", result, encoded->size);
 			return;
 		} else {
 			chansendul(frame->errCh, DPX_ERROR_NONE);

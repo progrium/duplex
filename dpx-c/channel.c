@@ -27,6 +27,7 @@ dpx_channel* _dpx_channel_new() {
 void dpx_channel_free(dpx_channel* c) {
 	dpx_channel_close(c, DPX_ERROR_FREEING);
 	free(c->lock);
+	free(c->method);
 	free(c);
 }
 
@@ -49,7 +50,10 @@ dpx_channel* dpx_channel_new_server(dpx_duplex_conn *conn, dpx_frame *frame) {
 	ptr->peer = conn->peer;
 
 	ptr->id = frame->channel;
-	ptr->method = frame->method;
+
+	char* methodcpy = (char*) malloc(strlen(frame->method) + 1);
+	strcpy(methodcpy, frame->method);
+	ptr->method = methodcpy;
 
 	taskcreate(&dpx_channel_pump_outgoing, ptr, DPX_TASK_STACK_SIZE);
 	dpx_duplex_conn_link_channel(conn, ptr);
@@ -196,7 +200,7 @@ void dpx_channel_pump_outgoing(dpx_channel *c) {
 				printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
 				DPX_ERROR err = dpx_duplex_conn_write_frame(c->conn, frame);
 				if (err) {
-					printf("(%d) Error sending frame: %d\n", err);
+					printf("(%d) Error sending frame: %lu\n", c->peer->index, err);
 
 					// check if we have a new connection...
 					if (c->connCh == NULL) {

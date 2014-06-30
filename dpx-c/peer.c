@@ -80,6 +80,8 @@ int dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
 	for (tmp=p->conns; tmp != NULL; tmp=tmp->next)
 		connlen++;
 
+	assert(connlen != 0);
+
 	int index = p->rrIndex % connlen;
 	qlock(p->lock);
 
@@ -115,7 +117,7 @@ void dpx_peer_route_open_frames(dpx_peer *p) {
 			if (err == DPX_ERROR_NONE) {
 				if (p->openFrames == NULL)
 					return;
-				chanrecv(p->openFrames, frame); // FIXME
+				chanrecv(p->openFrames, &frame);
 			}
 			dpx_duplex_conn* conn;
 			int index = dpx_peer_next_conn(p, &conn);
