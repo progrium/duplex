@@ -1,7 +1,7 @@
-#include "dpx-c.h"
+#include "dpx-internal.h"
 #include <string.h>
 
-dpx_duplex_conn* dpx_duplex_conn_new(dpx_peer *p, int fd) {
+dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd) {
 	dpx_duplex_conn* c = (dpx_duplex_conn*) malloc(sizeof(dpx_duplex_conn));
 
 	c->lock = (QLock*) calloc(1, sizeof(QLock));
@@ -15,11 +15,11 @@ dpx_duplex_conn* dpx_duplex_conn_new(dpx_peer *p, int fd) {
 	return c;
 }
 
-void dpx_duplex_conn_close(dpx_duplex_conn *c) {
+void _dpx_duplex_conn_close(dpx_duplex_conn *c) {
 	close(c->connfd);
 }
 
-void dpx_duplex_conn_free(dpx_duplex_conn *c) {
+void _dpx_duplex_conn_free(dpx_duplex_conn *c) {
 	free(c->lock);
 	chanfree(c->writeCh);
 
@@ -32,7 +32,7 @@ void dpx_duplex_conn_free(dpx_duplex_conn *c) {
 	free(c);
 }
 
-void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
+void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 	// FIXME make sure conn is open (see libtask netaccept and fdopen())
 
 	char buf[DPX_DUPLEX_CONN_CHUNK];
@@ -52,7 +52,7 @@ void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 			// result is here!
 			msgpack_object obj = result.data;
 
-			dpx_frame* frame = dpx_frame_msgpack_from(&obj);
+			dpx_frame* frame = _dpx_frame_msgpack_from(&obj);
 
 			// got the frame, now save it.
 			qlock(c->lock);
@@ -62,24 +62,24 @@ void dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 
 			qunlock(c->lock);
 			if (channel != NULL && frame->type == DPX_FRAME_DATA) {
-				if (dpx_channel_handle_incoming(channel->value, frame))
+				if (_dpx_channel_handle_incoming(channel->value, frame))
 					continue;
 			}
 			if (channel == NULL && frame->type == DPX_FRAME_OPEN) {
-				if (dpx_peer_handle_open(c->peer, c, frame)) {
-					dpx_frame_free(frame);
+				if (_dpx_peer_handle_open(c->peer, c, frame)) {
+					_dpx_frame_free(frame);
 					continue;
 				}
 			}
 			printf("dropped frame, size %d", frame->payloadSize);
-			dpx_frame_free(frame);
+			_dpx_frame_free(frame);
 		}
 	}
 
 	// FIXME close(c.writeCh)
 }
 
-void dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
+void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 	while(1) {
 		if (c->writeCh == NULL)
 			return;
@@ -88,7 +88,7 @@ void dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 		if (!chanrecv(c->writeCh, &frame))
 			return;
 
-		msgpack_sbuffer* encoded = dpx_frame_msgpack_to(frame);
+		msgpack_sbuffer* encoded = _dpx_frame_msgpack_to(frame);
 		int result = fdwrite(c->connfd, encoded->data, encoded->size);
 
 		if (result < 0) {
@@ -105,12 +105,12 @@ void dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 	}
 }
 
-DPX_ERROR dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
+DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
 	chansend(c->writeCh, frame);
 	return chanrecvul(frame->errCh);
 }
 
-void dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
+void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	qlock(c->lock);
 	dpx_channel_map *insert = (dpx_channel_map*) malloc(sizeof(dpx_channel_map));
 	insert->key = ch->id;
@@ -125,7 +125,7 @@ void dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	qunlock(c->lock);
 }
 
-void dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
+void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	qlock(c->lock);
 	dpx_channel_map *m;
 

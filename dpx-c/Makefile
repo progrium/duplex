@@ -7,16 +7,17 @@ STATIC=$(NAME).a
 DESTDIR=
 PREFIX=/usr/local
 
-all: $(SHARED) $(STATIC)
+all: task $(SHARED) $(STATIC)
 
 OFILES=\
 	channel.o\
 	conn.o\
 	frame.o\
-	peer.o
+	peer.o \
+	dpx.o
 
 CC=gcc
-CFLAGS=-Wall -I. -ggdb -ltask -lmsgpack
+CFLAGS=-Wall -I. -Ilibtask -ggdb -ltask -lmsgpack -pthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -fPIC -c $*.c
@@ -27,10 +28,17 @@ $(SHARED): $(OFILES)
 $(STATIC): $(OFILES)
 	ar rcs $(STATIC) $(OFILES)
 
+task:
+	$(MAKE) -C libtask
+
+task_install:
+	$(MAKE) -C libtask install
+
 clean:
 	rm -f *.o $(SHARED) $(STATIC)
+	$(MAKE) -C libtask clean
 
-install: $(SHARED) $(STATIC)
+install: libtask $(SHARED) $(STATIC)
 	cp $(SHARED) $(DESTDIR)$(PREFIX)/lib
 	cp $(STATIC) $(DESTDIR)$(PREFIX)/lib
 	cp *.h $(DESTDIR)$(PREFIX)/include

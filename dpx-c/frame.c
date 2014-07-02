@@ -1,6 +1,6 @@
-#include "dpx-c.h"
+#include "dpx-internal.h"
 
-void dpx_frame_free(dpx_frame *frame) {
+void _dpx_frame_free(dpx_frame *frame) {
 	chanfree(frame->errCh);
 	free(frame->method);
 	free(frame->error);
@@ -12,7 +12,7 @@ void dpx_frame_free(dpx_frame *frame) {
 	free(frame);
 }
 
-dpx_frame* dpx_frame_new(dpx_channel *ch) {
+dpx_frame* _dpx_frame_new(dpx_channel *ch) {
 	dpx_frame *frame = (dpx_frame*) malloc(sizeof(dpx_frame));
 
 	frame->errCh = chancreate(sizeof(DPX_ERROR), 0);
@@ -35,13 +35,13 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	return frame;
 }
 
-dpx_frame* dpx_frame_msgpack_from(msgpack_object *obj) {
+dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 	msgpack_object_array arr = obj->via.array;
 
 	assert(arr.size == DPX_PACK_ARRAY_SIZE);
 
 	// create frame
-	dpx_frame* frame = dpx_frame_new(NULL);
+	dpx_frame* frame = _dpx_frame_new(NULL);
 
 	msgpack_object* o = arr.ptr;
 
@@ -97,7 +97,7 @@ dpx_frame* dpx_frame_msgpack_from(msgpack_object *obj) {
 	return frame;
 }
 
-msgpack_sbuffer* dpx_frame_msgpack_to(dpx_frame *frame) {
+msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame) {
 	msgpack_sbuffer* buf = msgpack_sbuffer_new();
 	msgpack_packer* pack = msgpack_packer_new(buf, msgpack_sbuffer_write);
 
