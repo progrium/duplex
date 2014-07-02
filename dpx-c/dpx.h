@@ -41,13 +41,13 @@ void dpx_peer_free(dpx_peer *p);
 dpx_peer* dpx_peer_new();
 
 dpx_channel* dpx_peer_open(dpx_peer *p, char *method);
+int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame);
+dpx_channel* dpx_peer_accept(dpx_peer *p);
+DPX_ERROR dpx_peer_close(dpx_peer *p);
+DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port);
+DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
 // FIXME below not cleaned up yet
-int _dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame);
-dpx_channel* _dpx_peer_accept(dpx_peer *p);
-DPX_ERROR _dpx_peer_close(dpx_peer *p);
-DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port);
-DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
 // ------------------------------- { channels } -------------------------------
 

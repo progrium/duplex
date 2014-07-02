@@ -3,10 +3,182 @@
 int _dpx_peer_index = 0;
 char byte = '\r';
 
-// [threadsafe functions are not prefixed with _]
-// [threadsafe functions come before un-threadsafe functions]
+void* _dpx_peer_free_helper(void *v) {
+	_dpx_peer_free((dpx_peer*) v);
+	return NULL;
+}
 
 void dpx_peer_free(dpx_peer *p) {
+	_dpx_a a;
+	a.function = &_dpx_peer_free_helper;
+	a.args = p;
+
+	assert(_dpx_joinfunc(&a) == NULL);
+}
+
+void* _dpx_peer_new_helper(void *v) {
+	assert(v == NULL);
+	return _dpx_peer_new();
+}
+
+dpx_peer* dpx_peer_new() {
+	_dpx_a a;
+	a.function = &_dpx_peer_new_helper;
+	a.args = NULL;
+
+	void* peer = _dpx_joinfunc(&a);
+	return (dpx_peer*)peer;
+}
+
+struct _dpx_peer_open_hs {
+	dpx_peer *p;
+	char* method;
+};
+
+void* _dpx_peer_open_helper(void* v) {
+	struct _dpx_peer_open_hs *h = (struct _dpx_peer_open_hs*) v;
+	return _dpx_peer_open(h->p, h->method);
+}
+
+dpx_channel* dpx_peer_open(dpx_peer *p, char *method) {
+	_dpx_a a;
+	a.function = &_dpx_peer_open_helper;
+
+	struct _dpx_peer_open_hs h;
+	h.p = p;
+	h.method = method;
+
+	a.args = &h;
+
+	void* res = _dpx_joinfunc(&a);
+	return (dpx_channel*) res;
+}
+
+struct _dpx_peer_handle_open_hs {
+	dpx_peer *p;
+	dpx_duplex_conn *conn;
+	dpx_frame *frame;
+	int ret;
+};
+
+void* _dpx_peer_handle_open_helper(void* v) {
+	struct _dpx_peer_handle_open_hs *h = (struct _dpx_peer_handle_open_hs*) v;
+	h->ret = _dpx_peer_handle_open(h->p, h->conn, h->frame);
+	return NULL;
+}
+
+int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) {
+	_dpx_a a;
+	a.function = &_dpx_peer_handle_open_helper;
+
+	struct _dpx_peer_handle_open_hs h;
+	h.p = p;
+	h.conn = conn;
+	h.frame = frame;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	
+	return h.ret;
+}
+
+void* _dpx_peer_accept_helper(void* v) {
+	dpx_peer *p = (dpx_peer*) v;
+	dpx_channel* ch = _dpx_peer_accept(p);
+	return ch;
+}
+
+dpx_channel* dpx_peer_accept(dpx_peer *p) {
+	_dpx_a a;
+	a.function = &_dpx_peer_accept_helper;
+	a.args = p;
+
+	void* ret = _dpx_joinfunc(&a);
+	
+	return (dpx_channel*)ret;
+}
+
+struct _dpx_peer_close_hs {
+	dpx_peer *p;
+	DPX_ERROR err;
+};
+
+void* _dpx_peer_close_helper(void* v) {
+	struct _dpx_peer_close_hs *h = (struct _dpx_peer_close_hs*) v;
+	h->err = _dpx_peer_close(h->p);
+	return NULL;
+}
+
+DPX_ERROR dpx_peer_close(dpx_peer *p) {
+	_dpx_a a;
+	a.function = &_dpx_peer_close_helper;
+
+	struct _dpx_peer_close_hs h;
+	h.p = p;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	
+	return h.err;
+}
+
+struct _dpx_peer_conbind_hs {
+	dpx_peer *p;
+	char* addr;
+	int port;
+	DPX_ERROR err;
+};
+
+void* _dpx_peer_connect_helper(void* v) {
+	struct _dpx_peer_conbind_hs *h = (struct _dpx_peer_conbind_hs*)v;
+	h->err = _dpx_peer_connect(h->p, h->addr, h->port);
+	return NULL;
+}
+
+DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port) {
+	_dpx_a a;
+	a.function = &_dpx_peer_connect_helper;
+
+	struct _dpx_peer_conbind_hs h;
+	h.p = p;
+	h.addr = addr;
+	h.port = port;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	
+	return h.err;
+}
+
+void* _dpx_peer_bind_helper(void* v) {
+	struct _dpx_peer_conbind_hs *h = (struct _dpx_peer_conbind_hs*)v;
+	h->err = _dpx_peer_bind(h->p, h->addr, h->port);
+	return NULL;
+}
+
+DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port) {
+	_dpx_a a;
+	a.function = &_dpx_peer_bind_helper;
+
+	struct _dpx_peer_conbind_hs h;
+	h.p = p;
+	h.addr = addr;
+	h.port = port;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	
+	return h.err;
+}
+
+
+// ----------------------------------------------------------------------------
+
+void _dpx_peer_free(dpx_peer *p) {
 	free(p->lock);
 
 	dpx_peer_listener *l, *nl;
@@ -30,7 +202,7 @@ void dpx_peer_free(dpx_peer *p) {
 }
 
 // FIXME this isn't threadsafe (taskcreate is called)
-dpx_peer* dpx_peer_new() {
+dpx_peer* _dpx_peer_new() {
 	dpx_peer* peer = (dpx_peer*) malloc(sizeof(dpx_peer));
 
 	peer->lock = (QLock*) calloc(1, sizeof(QLock));
@@ -53,33 +225,6 @@ dpx_peer* dpx_peer_new() {
 	taskcreate(&_dpx_peer_route_open_frames, peer, DPX_TASK_STACK_SIZE);
 	return peer;
 }
-
-struct _dpx_peer_open_hs {
-	dpx_peer *p;
-	char* method;
-};
-
-void* _dpx_peer_open_helper(void* v) {
-	struct _dpx_peer_open_hs *h = (struct _dpx_peer_open_hs*) v;
-	return _dpx_peer_open(h->p, h->method);
-}
-
-dpx_channel* dpx_peer_open(dpx_peer *p, char *method) {
-	_dpx_a *a = malloc(sizeof(_dpx_a));
-	a->function = &_dpx_peer_open_helper;
-
-	struct _dpx_peer_open_hs *h = malloc(sizeof(struct _dpx_peer_open_hs));
-	h->p = p;
-	h->method = method;
-
-	a->args = h;
-
-	void* res = _dpx_joinfunc(a);
-	free(a);
-	return (dpx_channel*) res;
-}
-
-// [non threadsafe follows]
 
 void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 	dpx_duplex_conn* dc = _dpx_duplex_conn_new(p, fd);

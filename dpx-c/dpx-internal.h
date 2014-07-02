@@ -74,8 +74,8 @@ struct _dpx_peer {
 	Channel* firstConn;
 };
 
-// dpx_peer_free -> dpx.h
-// dpx_peer_new -> dpx.h
+void _dpx_peer_free(dpx_peer *p);
+dpx_peer* _dpx_peer_new();
 
 void _dpx_peer_accept_connection(dpx_peer *p, int fd);
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn);

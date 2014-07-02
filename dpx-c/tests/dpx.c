@@ -17,21 +17,32 @@ void* test_function(void* v) {
 	return &test_function_ret;
 }
 
-START_TEST(test_dpx_comm) {
+START_TEST(test_dpx_thread_communication) {
 	dpx_init();
 
-	_dpx_a *a = malloc(sizeof(_dpx_a));
-	a->function = &test_function;
+	_dpx_a a;
+	a.function = &test_function;
 	int j = 10;
-	a->args = &j;
+	a.args = &j;
 
-	void* res = _dpx_joinfunc(a);
+	void* res = _dpx_joinfunc(&a);
 
 	ck_assert_msg(res != NULL, "result is NULL?");
 	int cast = *(int*)res;
 	ck_assert_int_eq(test_function_ret, cast);
 
-	free(a);
+	dpx_cleanup();
+} END_TEST
+
+START_TEST(test_dpx_peer_creation) {
+	dpx_init();
+
+	dpx_peer* p1 = dpx_peer_new();
+	dpx_peer* p2 = dpx_peer_new();
+
+	dpx_peer_free(p1);
+	dpx_peer_free(p2);
+
 	dpx_cleanup();
 } END_TEST
 
@@ -42,7 +53,8 @@ dpx_suite_core(void)
 
 	TCase *tc_core = tcase_create("Basic Functions");
 	tcase_add_test(tc_core, test_dpx_init);
-	tcase_add_test(tc_core, test_dpx_comm);
+	tcase_add_test(tc_core, test_dpx_thread_communication);
+	tcase_add_test(tc_core, test_dpx_peer_creation);
 
 	suite_add_tcase(s, tc_core);
 
