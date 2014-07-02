@@ -4,6 +4,7 @@
 // BEFORE YOU DO ANYTHING WITH THIS API, YOU MUST INITIALISE THE COR-SCHEDULER.
 void dpx_init();
 // OTHERWISE PREPARE FOR TROUBLE
+void dpx_cleanup();
 
 // -------------------------------- { errors } --------------------------------
 #define DPX_ERROR_NONE 0

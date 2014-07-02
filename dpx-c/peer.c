@@ -29,6 +29,7 @@ void dpx_peer_free(dpx_peer *p) {
 	free(p);
 }
 
+// FIXME this isn't threadsafe (taskcreate is called)
 dpx_peer* dpx_peer_new() {
 	dpx_peer* peer = (dpx_peer*) malloc(sizeof(dpx_peer));
 
@@ -74,6 +75,7 @@ dpx_channel* dpx_peer_open(dpx_peer *p, char *method) {
 	a->args = h;
 
 	void* res = _dpx_joinfunc(a);
+	free(a);
 	return (dpx_channel*) res;
 }
 

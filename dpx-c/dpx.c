@@ -27,9 +27,9 @@ void* _dpx_joinfunc(_dpx_a *a) {
 	strcpy(sa.sun_path, name);
 
 	len = strlen(sa.sun_path) + sizeof(sa.sun_family);
-	if(connect(fd, (struct sockaddr*)&sa, len) == -1){
-		fprintf(stderr, "failed to connect\n");
-		abort();
+	while(connect(fd, (struct sockaddr*)&sa, len) == -1){
+		fprintf(stderr, "failed to connect, waiting 1 second to try again\n");
+		sleep(1);
 	}
 
 	if (write(fd, &a, sizeof(void*)) != sizeof(void*)) {
@@ -51,6 +51,8 @@ void* _dpx_joinfunc(_dpx_a *a) {
 
 // +thread libtask
 void _dpx_libtask_checker(void* v) {
+	taskname("dpx_libtask_checker");
+	
 	if (listen(task_sock, DPX_SOCK_LIMIT) == -1) {
 		fprintf(stderr, "failed to listen");
 		return;
@@ -124,4 +126,9 @@ void dpx_init() {
 
 	pthread_create(&task_thread, NULL, &_dpx_libtask_thread, NULL);
 	pthread_detach(task_thread);
+}
+
+void dpx_cleanup() {
+	unlink(name);
+	pthread_cancel(task_thread);
 }

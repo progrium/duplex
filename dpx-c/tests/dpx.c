@@ -4,15 +4,46 @@
 
 START_TEST(test_dpx_init) {
 	dpx_init();
+	dpx_cleanup();
+} END_TEST
+
+int test_function_ret = 4;
+
+void* test_function(void* v) {
+	int j = *(int*)v;
+	ck_assert_int_eq(j, 10);
+	ck_assert_str_eq(taskgetname(), "dpx_libtask_checker");
+
+	return &test_function_ret;
+}
+
+START_TEST(test_dpx_comm) {
+	dpx_init();
+
+	_dpx_a *a = malloc(sizeof(_dpx_a));
+	a->function = &test_function;
+	int j = 10;
+	a->args = &j;
+
+	void* res = _dpx_joinfunc(a);
+
+	ck_assert_msg(res != NULL, "result is NULL?");
+	int cast = *(int*)res;
+	ck_assert_int_eq(test_function_ret, cast);
+
+	free(a);
+	dpx_cleanup();
 } END_TEST
 
 Suite*
-dpx_suite(void)
+dpx_suite_core(void)
 {
-	Suite *s = suite_create("DPX Threadsafe");
+	Suite *s = suite_create("DPX-C Core");
 
-	TCase *tc_core = tcase_create("Core");
+	TCase *tc_core = tcase_create("Basic Functions");
 	tcase_add_test(tc_core, test_dpx_init);
+	tcase_add_test(tc_core, test_dpx_comm);
+
 	suite_add_tcase(s, tc_core);
 
 	return s;
@@ -22,7 +53,7 @@ int
 main(void)
 {
 	int number_failed;
-	Suite *s = dpx_suite();
+	Suite *s = dpx_suite_core();
 
 	SRunner *sr = srunner_create(s);
 	srunner_run_all(sr, CK_NORMAL);
