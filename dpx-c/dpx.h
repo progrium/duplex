@@ -36,14 +36,12 @@ typedef struct _dpx_peer dpx_peer;
 
 // --------------------------------- { peers } --------------------------------
 
-void _dpx_peer_free(dpx_peer *p);
-dpx_peer* _dpx_peer_new();
+void dpx_peer_free(dpx_peer *p);
+dpx_peer* dpx_peer_new();
 
-void _dpx_peer_accept_connection(dpx_peer *p, int fd);
-int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn);
-void _dpx_peer_route_open_frames(dpx_peer *p);
+dpx_channel* dpx_peer_open(dpx_peer *p, char *method);
 
-dpx_channel* _dpx_peer_open(dpx_peer *p, char *method);
+// FIXME below not cleaned up yet
 int _dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame);
 dpx_channel* _dpx_peer_accept(dpx_peer *p);
 DPX_ERROR _dpx_peer_close(dpx_peer *p);

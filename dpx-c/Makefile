@@ -38,6 +38,9 @@ clean:
 	rm -f *.o $(SHARED) $(STATIC)
 	$(MAKE) -C libtask clean
 
+check:
+	$(MAKE) -C tests check
+
 install: libtask $(SHARED) $(STATIC)
 	cp $(SHARED) $(DESTDIR)$(PREFIX)/lib
 	cp $(STATIC) $(DESTDIR)$(PREFIX)/lib

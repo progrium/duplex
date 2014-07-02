@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t task_thread;
 
 // socket communication
@@ -13,13 +12,6 @@ int task_sock;
 struct sockaddr_un local;
 
 char* name;
-
-struct _dpx_a {
-	void* (*function)(void*);
-	void *args;
-};
-
-typedef struct _dpx_a _dpx_a;
 
 // +communication function w/ libtask thread
 void* _dpx_joinfunc(_dpx_a *a) {

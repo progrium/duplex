@@ -16,6 +16,17 @@
 // -------------------------------- { errors } --------------------------------
 // [ declarations have been moved to dpx.h in order for clients to utilise it ]
 
+// -------------------------- { libtask thread com } --------------------------
+struct _dpx_a {
+	void* (*function)(void*);
+	void *args;
+};
+
+typedef struct _dpx_a _dpx_a;
+
+// Communicator with the libtask thread
+void* _dpx_joinfunc(_dpx_a *a);
+
 // ------------------------- { forward declarations } -------------------------
 
 struct _dpx_duplex_conn;
@@ -63,8 +74,8 @@ struct _dpx_peer {
 	Channel* firstConn;
 };
 
-void _dpx_peer_free(dpx_peer *p);
-dpx_peer* _dpx_peer_new();
+// dpx_peer_free -> dpx.h
+// dpx_peer_new -> dpx.h
 
 void _dpx_peer_accept_connection(dpx_peer *p, int fd);
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn);
