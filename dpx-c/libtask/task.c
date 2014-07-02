@@ -346,7 +346,7 @@ static void
 taskmainstart(void *v)
 {
 	taskname("taskmain");
-	taskmain(taskargc, taskargv);
+	//taskmain(taskargc, taskargv);
 }
 
 void

@@ -1,4 +1,4 @@
-NAME=dpx-c
+NAME=libdpx
 VERSION := $(shell git describe --abbrev=4 --dirty --always)
 
 SHARED=$(NAME).so
@@ -37,8 +37,9 @@ task_install:
 clean:
 	rm -f *.o $(SHARED) $(STATIC)
 	$(MAKE) -C libtask clean
+	$(MAKE) -C tests clean
 
-check:
+check: all
 	$(MAKE) -C tests check
 
 install: libtask $(SHARED) $(STATIC)
