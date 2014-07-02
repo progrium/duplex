@@ -56,7 +56,7 @@ dpx_peer* dpx_peer_new() {
 struct _dpx_peer_open_hs {
 	dpx_peer *p;
 	char* method;
-}
+};
 
 void* _dpx_peer_open_helper(void* v) {
 	struct _dpx_peer_open_hs *h = (struct _dpx_peer_open_hs*) v;
