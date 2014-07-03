@@ -84,8 +84,11 @@ int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) {
 }
 
 void* _dpx_peer_accept_helper(void* v) {
+	printf("12-3\n");
 	dpx_peer *p = (dpx_peer*) v;
+	printf("12-4\n");
 	dpx_channel* ch = _dpx_peer_accept(p);
+	printf("12-5\n");
 	return ch;
 }
 
@@ -94,6 +97,8 @@ dpx_channel* dpx_peer_accept(dpx_peer *p) {
 	a.function = &_dpx_peer_accept_helper;
 	a.args = p;
 
+	printf("12-1\n");
+	printf("12-2\n");
 	void* ret = _dpx_joinfunc(&a);
 	
 	return (dpx_channel*)ret;
@@ -313,12 +318,12 @@ dpx_channel* _dpx_peer_open(dpx_peer *p, char *method) {
 		goto _dpx_peer_open_cleanup;
 
 	ret = _dpx_channel_new_client(p, method);
-	dpx_frame* frame = _dpx_frame_new(ret);
+	dpx_frame* frame = dpx_frame_new(ret);
 
 	frame->type = DPX_FRAME_OPEN;
 	frame->method = method;
 
-	chansend(p->openFrames, frame);
+	chansend(p->openFrames, &frame);
 
 _dpx_peer_open_cleanup:
 	qunlock(p->lock);
@@ -332,7 +337,9 @@ int _dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) 
 	if (p->closed)
 		goto _dpx_peer_handle_open_cleanup;
 
-	chansend(p->incomingChannels, _dpx_channel_new_server(conn, frame));
+	dpx_channel* server = _dpx_channel_new_server(conn, frame);
+
+	chansend(p->incomingChannels, &server);
 	ret = 1;
 
 _dpx_peer_handle_open_cleanup:
@@ -344,7 +351,12 @@ dpx_channel* _dpx_peer_accept(dpx_peer *p) {
 	if (p->incomingChannels == NULL)
 		return NULL;
 	// FIXME we can't detect a channel we close... or can we?
-	return chanrecvp(p->incomingChannels);
+	dpx_channel* chan;
+	if (!chanrecv(p->incomingChannels, &chan)) {
+		fprintf(stderr, "failed to accept incoming channel\n");
+		return NULL;
+	}
+	return chan;
 }
 
 DPX_ERROR _dpx_peer_close(dpx_peer *p) {

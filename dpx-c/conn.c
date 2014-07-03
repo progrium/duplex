@@ -44,7 +44,7 @@ void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 	msgpack_unpacker_init(&unpacker, DPX_DUPLEX_CONN_BUFFER);
 	msgpack_unpacked_init(&result);
 
-	while((read_size = fdread(c->connfd, buf, DPX_DUPLEX_CONN_CHUNK)) > 0) {
+	while((read_size = fdread1(c->connfd, buf, DPX_DUPLEX_CONN_CHUNK)) > 0) {
 		msgpack_unpacker_reserve_buffer(&unpacker, read_size);
 		memcpy(msgpack_unpacker_buffer(&unpacker), buf, read_size);
 		msgpack_unpacker_buffer_consumed(&unpacker, read_size);
@@ -67,12 +67,12 @@ void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 			}
 			if (channel == NULL && frame->type == DPX_FRAME_OPEN) {
 				if (_dpx_peer_handle_open(c->peer, c, frame)) {
-					_dpx_frame_free(frame);
+					dpx_frame_free(frame);
 					continue;
 				}
 			}
 			printf("dropped frame, size %d", frame->payloadSize);
-			_dpx_frame_free(frame);
+			dpx_frame_free(frame);
 		}
 	}
 
@@ -106,7 +106,7 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 }
 
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
-	chansend(c->writeCh, frame);
+	chansend(c->writeCh, &frame);
 	return chanrecvul(frame->errCh);
 }
 

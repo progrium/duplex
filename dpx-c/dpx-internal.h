@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 #include "dpx.h"
-#include "uthash.h"
 
 //#define NDEBUG
 #include <assert.h>
@@ -117,39 +116,17 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);
 int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame);
 void _dpx_channel_pump_outgoing(dpx_channel *c);
 
+// dpx_channel_method_get --> dpx.h
+char* _dpx_channel_method_set(dpx_channel *c, char* method);
+
 // -------------------------------- { frames } --------------------------------
-#define DPX_FRAME_OPEN 0
-#define DPX_FRAME_DATA 1
-#define DPX_FRAME_NOCH -1
+// #defines -> dpx.h
+// struct _dpx_header_map -> dpx.h
+// typedef dpx_header_map -> dpx.h
+// struct _dpx_frame -> dpx.h
 
-#define DPX_PACK_ARRAY_SIZE 7
-
-struct _dpx_header_map {
-	char* key;
-	char* value;
-	UT_hash_handle hh; // hasher
-};
-
-typedef struct _dpx_header_map dpx_header_map;
-
-struct _dpx_frame {
-	Channel *errCh;
-	dpx_channel *chanRef;
-
-	int type;
-	int channel;
-
-	char* method;
-	dpx_header_map *headers; // MUST ALWAYS INITIALISE TO NULL
-	char* error;
-	int last;
-
-	char* payload;
-	int payloadSize;
-};
-
-void _dpx_frame_free(dpx_frame *frame);
-dpx_frame* _dpx_frame_new(dpx_channel *ch);
+// dpx_frame_free -> dpx.h
+// dpx_frame_new -> dpx.h
 
 dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj);
 msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame);

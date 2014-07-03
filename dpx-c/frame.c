@@ -1,9 +1,11 @@
 #include "dpx-internal.h"
 
-void _dpx_frame_free(dpx_frame *frame) {
+void dpx_frame_free(dpx_frame *frame) {
 	chanfree(frame->errCh);
-	free(frame->method);
-	free(frame->error);
+	if (frame->method != NULL)
+		free(frame->method);
+	if (frame->error != NULL)
+		free(frame->error);
 	dpx_header_map *current, *tmp;
 	HASH_ITER(hh, frame->headers, current, tmp) {
 		HASH_DEL(frame->headers, current);
@@ -12,7 +14,7 @@ void _dpx_frame_free(dpx_frame *frame) {
 	free(frame);
 }
 
-dpx_frame* _dpx_frame_new(dpx_channel *ch) {
+dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	dpx_frame *frame = (dpx_frame*) malloc(sizeof(dpx_frame));
 
 	frame->errCh = chancreate(sizeof(DPX_ERROR), 0);
@@ -35,13 +37,15 @@ dpx_frame* _dpx_frame_new(dpx_channel *ch) {
 	return frame;
 }
 
+// ----------------------------------------------------------------------------
+
 dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 	msgpack_object_array arr = obj->via.array;
 
 	assert(arr.size == DPX_PACK_ARRAY_SIZE);
 
 	// create frame
-	dpx_frame* frame = _dpx_frame_new(NULL);
+	dpx_frame* frame = dpx_frame_new(NULL);
 
 	msgpack_object* o = arr.ptr;
 
@@ -105,8 +109,13 @@ msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame) {
 	msgpack_pack_int(pack, frame->type);
 	msgpack_pack_int(pack, frame->channel);
 
-	msgpack_pack_raw(pack, strlen(frame->method));
-	msgpack_pack_raw_body(pack, frame->method, strlen(frame->method));
+	if (frame->method != NULL) {
+		msgpack_pack_raw(pack, strlen(frame->method));
+		msgpack_pack_raw_body(pack, frame->method, strlen(frame->method));
+	} else {
+		msgpack_pack_raw(pack, 0);
+		msgpack_pack_raw_body(pack, "", 0);
+	}
 
 	msgpack_pack_map(pack, HASH_COUNT(frame->headers));
 
@@ -119,8 +128,13 @@ msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame) {
 		msgpack_pack_raw_body(pack, h->value, strlen(h->value));
 	}
 
-	msgpack_pack_raw(pack, strlen(frame->error));
-	msgpack_pack_raw_body(pack, frame->error, strlen(frame->error));
+	if (frame->error != NULL) {
+		msgpack_pack_raw(pack, strlen(frame->error));
+		msgpack_pack_raw_body(pack, frame->error, strlen(frame->error));
+	} else {
+		msgpack_pack_raw(pack, 0);
+		msgpack_pack_raw_body(pack, "", 0);
+	}
 
 	msgpack_pack_int(pack, frame->last);
 

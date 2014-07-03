@@ -62,7 +62,7 @@ void _dpx_libtask_checker(void* v) {
 		int remotesd;
 
 		if ((remotesd = sockaccept(task_sock)) == -1) {
-			fprintf(stderr, "failed to accept");
+			fprintf(stderr, "failed to accept\n");
 			close(remotesd);
 			return;
 		}

@@ -1,3 +1,5 @@
+#include "uthash.h"
+
 // ---------------------------- { threadsafe api } ----------------------------
 // ----------- [and frankly, the only one you should be touching...] ----------
 
@@ -37,9 +39,11 @@ typedef struct _dpx_peer dpx_peer;
 
 // --------------------------------- { peers } --------------------------------
 
+// object tors
 void dpx_peer_free(dpx_peer *p);
 dpx_peer* dpx_peer_new();
 
+// functions
 dpx_channel* dpx_peer_open(dpx_peer *p, char *method);
 int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame);
 dpx_channel* dpx_peer_accept(dpx_peer *p);
@@ -51,24 +55,55 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
 // ------------------------------- { channels } -------------------------------
 
-void _dpx_channel_free(dpx_channel* c);
-dpx_channel* _dpx_channel_new_client(dpx_peer *p, char* method);
-dpx_channel* _dpx_channel_new_server(dpx_duplex_conn *conn, dpx_frame *frame);
+// object tors
+void _dpx_channel_free(dpx_channel* c); // FIXME WHEN DO WE EVEN USE THIS?
 
-void _dpx_channel_close(dpx_channel *c, DPX_ERROR err);
-DPX_ERROR _dpx_channel_error(dpx_channel *c);
-dpx_frame* _dpx_channel_receive_frame(dpx_channel *c);
-DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);
-int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame);
-void _dpx_channel_pump_outgoing(dpx_channel *c);
+// functions
+DPX_ERROR dpx_channel_error(dpx_channel *c);
+dpx_frame* dpx_channel_receive_frame(dpx_channel *c);
+DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);
+int dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame);
+
+// properties
+char* dpx_channel_method_get(dpx_channel *c); // returns method
+char* dpx_channel_method_set(dpx_channel *c, char* method); // returns old one
 
 // -------------------------------- { frames } --------------------------------
+#define DPX_FRAME_OPEN 0
+#define DPX_FRAME_DATA 1
+#define DPX_FRAME_NOCH -1
 
-void _dpx_frame_free(dpx_frame *frame);
-dpx_frame* _dpx_frame_new(dpx_channel *ch);
+#define DPX_PACK_ARRAY_SIZE 7
 
-dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj);
-msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame);
+struct _dpx_header_map {
+	char* key;
+	char* value;
+	UT_hash_handle hh; // hasher
+};
+
+typedef struct _dpx_header_map dpx_header_map;
+
+struct _dpx_frame {
+	Channel *errCh;
+	dpx_channel *chanRef;
+
+	// below are meant to be modified.
+
+	int type;
+	int channel;
+
+	char* method;
+	dpx_header_map *headers; // use uthash.h to modify
+	char* error;
+	int last;
+
+	char* payload;
+	int payloadSize;
+};
+
+// object tors
+void dpx_frame_free(dpx_frame *frame);
+dpx_frame* dpx_frame_new(dpx_channel *ch);
 
 // -------------------------- { duplex connection } ---------------------------
 

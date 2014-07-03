@@ -1,6 +1,125 @@
 #include "dpx-internal.h"
 #include <string.h> // for strcmp
 
+struct _dpx_channel_error_hs {
+	dpx_channel *c;
+	DPX_ERROR err;
+};
+
+void* _dpx_channel_error_helper(void* v) {
+	struct _dpx_channel_error_hs *h = (struct _dpx_channel_error_hs*) v;
+	h->err = _dpx_channel_error(h->c);
+	return NULL;
+}
+
+DPX_ERROR dpx_channel_error(dpx_channel *c) {
+	_dpx_a a;
+	a.function = &_dpx_channel_error_helper;
+
+	struct _dpx_channel_error_hs h;
+	h.c = c;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	return h.err;
+}
+
+void* _dpx_channel_receive_frame_helper(void* v) {
+	return _dpx_channel_receive_frame((dpx_channel*)v);
+}
+
+dpx_frame* dpx_channel_receive_frame(dpx_channel *c) {
+	_dpx_a a;
+	a.function = &_dpx_channel_receive_frame_helper;
+	a.args = c;
+
+	return (dpx_frame*) _dpx_joinfunc(&a);
+}
+
+struct _dpx_channel_send_frame_hs {
+	dpx_channel *c;
+	dpx_frame *frame;
+	DPX_ERROR err;
+};
+
+void* _dpx_channel_send_frame_helper(void* v) {
+	struct _dpx_channel_send_frame_hs *h = (struct _dpx_channel_send_frame_hs*) v;
+	h->err = _dpx_channel_send_frame(h->c, h->frame);
+	return NULL;
+}
+
+DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
+	_dpx_a a;
+	a.function = &_dpx_channel_send_frame_helper;
+
+	struct _dpx_channel_send_frame_hs h;
+	h.c = c;
+	h.frame = frame;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	return h.err;
+}
+
+struct _dpx_channel_handle_incoming_hs {
+	dpx_channel *c;
+	dpx_frame *frame;
+	int ret;
+};
+
+void* _dpx_channel_handle_incoming_helper(void* v) {
+	struct _dpx_channel_handle_incoming_hs *h = (struct _dpx_channel_handle_incoming_hs*) v;
+	h->ret = _dpx_channel_handle_incoming(h->c, h->frame);
+	return NULL;
+}
+
+int dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
+	_dpx_a a;
+	a.function = &_dpx_channel_handle_incoming_helper;
+
+	struct _dpx_channel_handle_incoming_hs h;
+	h.c = c;
+	h.frame = frame;
+
+	a.args = &h;
+
+	_dpx_joinfunc(&a);
+	return h.ret;
+}
+
+char* dpx_channel_method_get(dpx_channel *c) {
+	return c->method;
+}
+
+struct _dpx_channel_method_set_hs {
+	dpx_channel *c;
+	char* method;
+};
+
+void* _dpx_channel_method_set_helper(void* v) {
+	struct _dpx_channel_method_set_hs *h = (struct _dpx_channel_method_set_hs*) v;
+	return _dpx_channel_method_set(h->c, h->method);
+}
+
+char* dpx_channel_method_set(dpx_channel *c, char* method) {
+	_dpx_a a;
+	a.function = &_dpx_channel_method_set_helper;
+
+	struct _dpx_channel_method_set_hs h;
+	h.c = c;
+	h.method = method;
+
+	a.args = &h;
+
+	void* ret = _dpx_joinfunc(&a);
+
+	return (char*)ret;
+}
+
+// ----------------------------------------------------------------------------
+
 dpx_channel* _dpx_channel_new() {
 	dpx_channel* ptr = (dpx_channel*) malloc(sizeof(dpx_channel));
 
@@ -178,7 +297,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 	chanrecv(c->connCh, c->conn);
 	printf("(%d) Pumping started for channel %d\n", c->peer->index, c->id);
 	while(1) {
-		taskyield();
+		taskdelay(50);
 
 		if (c->connCh == NULL) {
 			c->conn = NULL;
@@ -224,4 +343,10 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 
 _dpx_channel_pump_outgoing_cleanup:
 	printf("(%d) Pumping finished for channel %d\n", c->peer->index, c->id);
+}
+
+char* _dpx_channel_method_set(dpx_channel *c, char* method) {
+	char* ret = c->method;
+	c->method = method;
+	return ret;
 }
