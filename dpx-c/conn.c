@@ -32,7 +32,8 @@ void _dpx_duplex_conn_free(dpx_duplex_conn *c) {
 	free(c);
 }
 
-void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
+void _dpx_duplex_conn_read_frames(void *v) {
+	dpx_duplex_conn *c = v;
 	// FIXME make sure conn is open (see libtask netaccept and fdopen())
 
 	char buf[DPX_DUPLEX_CONN_CHUNK];
@@ -44,7 +45,7 @@ void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c) {
 	msgpack_unpacker_init(&unpacker, DPX_DUPLEX_CONN_BUFFER);
 	msgpack_unpacked_init(&result);
 
-	while((read_size = fdread1(c->connfd, buf, DPX_DUPLEX_CONN_CHUNK)) > 0) {
+	while((read_size = fdread(c->connfd, buf, DPX_DUPLEX_CONN_CHUNK)) > 0) {
 		msgpack_unpacker_reserve_buffer(&unpacker, read_size);
 		memcpy(msgpack_unpacker_buffer(&unpacker), buf, read_size);
 		msgpack_unpacker_buffer_consumed(&unpacker, read_size);

@@ -63,7 +63,6 @@ void _dpx_libtask_checker(void* v) {
 
 		if ((remotesd = sockaccept(task_sock)) == -1) {
 			fprintf(stderr, "failed to accept\n");
-			close(remotesd);
 			return;
 		}
 
@@ -104,7 +103,7 @@ void dpx_init() {
 	}
 
 	char constStr[] = "/tmp/dpxc_XXXXXX";
-	name = malloc(strlen(constStr));
+	name = malloc(strlen(constStr) + 1);
 	strcpy(name, constStr);
 
 	int tmpfd;

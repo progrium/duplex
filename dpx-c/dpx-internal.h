@@ -155,7 +155,7 @@ void _dpx_duplex_conn_free(dpx_duplex_conn *c); // BEWARE, FREE DOES NOT CALL CL
 void _dpx_duplex_conn_close(dpx_duplex_conn *c);
 dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd);
 
-void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c);
+void _dpx_duplex_conn_read_frames(void *v);
 void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c);
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame);
 void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch);

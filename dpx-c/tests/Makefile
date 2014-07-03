@@ -10,7 +10,7 @@ check: $(BINARY)
 	./check_dpx
 
 CC=gcc
-CFLAGS=-Wall -I. -I.. -I../libtask -ggdb -ltask -lmsgpack -L.. -L../libtask -Wl,-rpath ../libtask -Wl,-rpath .. -ldpx -pthread `pkg-config --cflags --libs check`
+CFLAGS=-Wall -I. -I.. -I../libtask -ggdb -ltask -lmsgpack -L.. -L../libtask -Wl,-rpath ../libtask -Wl,-rpath .. -ldpx -fcheck=all -pthread `pkg-config --cflags --libs check`
 
 %.o: %.c
 	$(CC) $(CFLAGS) -fPIC -c $*.c
