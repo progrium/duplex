@@ -3,18 +3,17 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-pthread_t task_thread;
+struct _dpx_context {
+	pthread_t task_thread;
+	int task_sock;
+	char* name;
+};
 
 // socket communication
 #define DPX_SOCK_LIMIT 1024
 
-int task_sock;
-struct sockaddr_un local;
-
-char* name;
-
 // +communication function w/ libtask thread
-void* _dpx_joinfunc(_dpx_a *a) {
+void* _dpx_joinfunc(dpx_context *c, _dpx_a *a) {
 	int fd, len;
 	struct sockaddr_un sa;
 
@@ -24,7 +23,7 @@ void* _dpx_joinfunc(_dpx_a *a) {
 	
 	memset(&sa, 0, sizeof(sa));
 	sa.sun_family = AF_UNIX;
-	strcpy(sa.sun_path, name);
+	strcpy(sa.sun_path, c->name);
 
 	len = strlen(sa.sun_path) + sizeof(sa.sun_family);
 	while(connect(fd, (struct sockaddr*)&sa, len) == -1){
@@ -51,9 +50,11 @@ void* _dpx_joinfunc(_dpx_a *a) {
 
 // +thread libtask
 void _dpx_libtask_checker(void* v) {
-	taskname("dpx_libtask_checker");
+	dpx_context *c = v;
+
+	taskname("dpx_libtask_checker_%s", c->name);
 	
-	if (listen(task_sock, DPX_SOCK_LIMIT) == -1) {
+	if (listen(c->task_sock, DPX_SOCK_LIMIT) == -1) {
 		fprintf(stderr, "failed to listen");
 		return;
 	}
@@ -61,7 +62,7 @@ void _dpx_libtask_checker(void* v) {
 	while(1) {
 		int remotesd;
 
-		if ((remotesd = sockaccept(task_sock)) == -1) {
+		if ((remotesd = sockaccept(c->task_sock)) == -1) {
 			fprintf(stderr, "failed to accept\n");
 			return;
 		}
@@ -87,7 +88,7 @@ void _dpx_libtask_checker(void* v) {
 
 // +thread libtask
 void* _dpx_libtask_thread(void* v) {
-	taskinit(&_dpx_libtask_checker, NULL);
+	taskinit(&_dpx_libtask_checker, v);
 
 	fprintf(stderr, "libtask thread ended unexpectedly");
 	abort();
@@ -95,7 +96,13 @@ void* _dpx_libtask_thread(void* v) {
 }
 
 // Initialise the coroutines on a seperate thread.
-void dpx_init() {
+dpx_context* dpx_init() {
+	struct sockaddr_un local;
+
+	pthread_t task_thread;
+	int task_sock;
+	char* name;
+
 	task_sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (task_sock == -1) {
 		fprintf(stderr, "failed to open socket\n");
@@ -123,11 +130,22 @@ void dpx_init() {
 		abort();
 	}
 
-	pthread_create(&task_thread, NULL, &_dpx_libtask_thread, NULL);
+	dpx_context *ret = calloc(1, sizeof(dpx_context));
+	ret->task_thread = task_thread;
+	ret->task_sock = task_sock;
+	ret->name = name;
+
+	pthread_create(&task_thread, NULL, &_dpx_libtask_thread, ret);
 	pthread_detach(task_thread);
+
+	return ret;
 }
 
-void dpx_cleanup() {
-	unlink(name);
-	pthread_cancel(task_thread);
+void dpx_cleanup(dpx_context *c) {
+	unlink(c->name);
+	pthread_cancel(c->task_thread);
+	close(c->task_sock);
+
+	free(c->name);
+	free(c);
 }

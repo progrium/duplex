@@ -6,8 +6,8 @@
 #include "../dpx-internal.h"
 
 START_TEST(test_dpx_init) {
-	dpx_init();
-	dpx_cleanup();
+	dpx_context *c = dpx_init();
+	dpx_cleanup(c);
 } END_TEST
 
 int test_function_ret = 4;
@@ -15,33 +15,33 @@ int test_function_ret = 4;
 void* test_function(void* v) {
 	int j = *(int*)v;
 	ck_assert_int_eq(j, 10);
-	ck_assert_str_eq(taskgetname(), "dpx_libtask_checker");
+	//ck_assert_str_eq(taskgetname(), "dpx_libtask_checker");
 
 	return &test_function_ret;
 }
 
 START_TEST(test_dpx_thread_communication) {
-	dpx_init();
+	dpx_context *c = dpx_init();
 
 	_dpx_a a;
 	a.function = &test_function;
 	int j = 10;
 	a.args = &j;
 
-	void* res = _dpx_joinfunc(&a);
+	void* res = _dpx_joinfunc(c, &a);
 
 	ck_assert_msg(res != NULL, "result is NULL?");
 	int cast = *(int*)res;
 	ck_assert_int_eq(test_function_ret, cast);
 
-	dpx_cleanup();
+	dpx_cleanup(c);
 } END_TEST
 
 START_TEST(test_dpx_peer_frame_send_receive) {
-	dpx_init();
+	dpx_context *c = dpx_init();
 
-	dpx_peer* p1 = dpx_peer_new();
-	dpx_peer* p2 = dpx_peer_new();
+	dpx_peer* p1 = dpx_peer_new(c);
+	dpx_peer* p2 = dpx_peer_new(c);
 
 	ck_assert_msg(dpx_peer_bind(p1, "127.0.0.1", 9876) == DPX_ERROR_NONE, "Error encountered trying to bind.");
 	ck_assert_msg(dpx_peer_connect(p2, "127.0.0.1", 9876) == DPX_ERROR_NONE, "Error encountered trying to connect.");
@@ -122,7 +122,7 @@ START_TEST(test_dpx_peer_frame_send_receive) {
 
 	// FIXME - maybe failing because already being freed due to last? WHAT?
 
-	dpx_cleanup();
+	dpx_cleanup(c);
 } END_TEST
 
 // WARNING: does not free orig
@@ -181,19 +181,19 @@ START_TEST(test_dpx_rpc_call) {
 	}
 
 	if (pid == 0) { // child
-		dpx_init();
+		dpx_context *c = dpx_init();
 
-		dpx_peer* server = dpx_peer_new();
+		dpx_peer* server = dpx_peer_new(c);
 		ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to bind.");
 
 		test_dpx_receive(server);
 
 		dpx_peer_close(server);
-		dpx_cleanup();
+		dpx_cleanup(c);
 	} else {
-		dpx_init();
+		dpx_context *c = dpx_init();
 
-		dpx_peer* client = dpx_peer_new();
+		dpx_peer* client = dpx_peer_new(c);
 		ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to connect.");
 
 		char* payload = "123";
@@ -209,7 +209,7 @@ START_TEST(test_dpx_rpc_call) {
 		kill(pid, SIGKILL); // kill the child, cause I don't care about it anymore.
 
 		dpx_peer_close(client);
-		dpx_cleanup();
+		dpx_cleanup(c);
 	}
 
 } END_TEST

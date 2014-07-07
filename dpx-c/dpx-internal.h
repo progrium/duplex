@@ -24,7 +24,7 @@ struct _dpx_a {
 typedef struct _dpx_a _dpx_a;
 
 // Communicator with the libtask thread
-void* _dpx_joinfunc(_dpx_a *a);
+void* _dpx_joinfunc(dpx_context *c, _dpx_a *a);
 
 // ------------------------- { forward declarations } -------------------------
 
@@ -62,6 +62,8 @@ typedef struct _dpx_peer_connection dpx_peer_connection;
 
 struct _dpx_peer {
 	QLock *lock;
+	dpx_context *context;
+	
 	dpx_peer_listener *listeners; // listener fds
 	dpx_peer_connection *conns;
 	Channel* openFrames;
@@ -74,7 +76,7 @@ struct _dpx_peer {
 };
 
 void _dpx_peer_free(dpx_peer *p);
-dpx_peer* _dpx_peer_new();
+dpx_peer* _dpx_peer_new(dpx_context *context);
 
 void _dpx_peer_accept_connection(dpx_peer *p, int fd);
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn);

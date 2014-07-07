@@ -21,7 +21,7 @@ DPX_ERROR dpx_channel_error(dpx_channel *c) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(c->peer->context, &a);
 	return h.err;
 }
 
@@ -34,7 +34,7 @@ dpx_frame* dpx_channel_receive_frame(dpx_channel *c) {
 	a.function = &_dpx_channel_receive_frame_helper;
 	a.args = c;
 
-	return (dpx_frame*) _dpx_joinfunc(&a);
+	return (dpx_frame*) _dpx_joinfunc(c->peer->context, &a);
 }
 
 struct _dpx_channel_send_frame_hs {
@@ -59,7 +59,7 @@ DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(c->peer->context, &a);
 	return h.err;
 }
 
@@ -85,7 +85,7 @@ int dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(c->peer->context, &a);
 	return h.ret;
 }
 
@@ -113,7 +113,7 @@ char* dpx_channel_method_set(dpx_channel *c, char* method) {
 
 	a.args = &h;
 
-	void* ret = _dpx_joinfunc(&a);
+	void* ret = _dpx_joinfunc(c->peer->context, &a);
 
 	return (char*)ret;
 }

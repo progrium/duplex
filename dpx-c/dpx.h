@@ -3,10 +3,13 @@
 // ---------------------------- { threadsafe api } ----------------------------
 // ----------- [and frankly, the only one you should be touching...] ----------
 
+struct _dpx_context;
+typedef struct _dpx_context dpx_context;
+
 // BEFORE YOU DO ANYTHING WITH THIS API, YOU MUST INITIALISE THE COR-SCHEDULER.
-void dpx_init();
+dpx_context* dpx_init();
 // OTHERWISE PREPARE FOR TROUBLE
-void dpx_cleanup();
+void dpx_cleanup(dpx_context* c);
 
 // -------------------------------- { errors } --------------------------------
 #define DPX_ERROR_NONE 0
@@ -41,7 +44,7 @@ typedef struct _dpx_peer dpx_peer;
 
 // object tors
 void dpx_peer_free(dpx_peer *p);
-dpx_peer* dpx_peer_new();
+dpx_peer* dpx_peer_new(dpx_context *context);
 
 // functions
 dpx_channel* dpx_peer_open(dpx_peer *p, char *method);

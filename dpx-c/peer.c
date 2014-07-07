@@ -13,20 +13,19 @@ void dpx_peer_free(dpx_peer *p) {
 	a.function = &_dpx_peer_free_helper;
 	a.args = p;
 
-	assert(_dpx_joinfunc(&a) == NULL);
+	assert(_dpx_joinfunc(p->context, &a) == NULL);
 }
 
 void* _dpx_peer_new_helper(void *v) {
-	assert(v == NULL);
-	return _dpx_peer_new();
+	return _dpx_peer_new((dpx_context*) v);
 }
 
-dpx_peer* dpx_peer_new() {
+dpx_peer* dpx_peer_new(dpx_context *context) {
 	_dpx_a a;
 	a.function = &_dpx_peer_new_helper;
-	a.args = NULL;
+	a.args = context;
 
-	void* peer = _dpx_joinfunc(&a);
+	void* peer = _dpx_joinfunc(context, &a);
 	return (dpx_peer*)peer;
 }
 
@@ -50,7 +49,7 @@ dpx_channel* dpx_peer_open(dpx_peer *p, char *method) {
 
 	a.args = &h;
 
-	void* res = _dpx_joinfunc(&a);
+	void* res = _dpx_joinfunc(p->context, &a);
 	return (dpx_channel*) res;
 }
 
@@ -78,7 +77,7 @@ int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(p->context, &a);
 	
 	return h.ret;
 }
@@ -94,7 +93,7 @@ dpx_channel* dpx_peer_accept(dpx_peer *p) {
 	a.function = &_dpx_peer_accept_helper;
 	a.args = p;
 
-	void* ret = _dpx_joinfunc(&a);
+	void* ret = _dpx_joinfunc(p->context, &a);
 	
 	return (dpx_channel*)ret;
 }
@@ -119,7 +118,7 @@ DPX_ERROR dpx_peer_close(dpx_peer *p) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(p->context, &a);
 	
 	return h.err;
 }
@@ -148,7 +147,7 @@ DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(p->context, &a);
 	
 	return h.err;
 }
@@ -170,7 +169,7 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(&a);
+	_dpx_joinfunc(p->context, &a);
 	
 	return h.err;
 }
@@ -201,11 +200,11 @@ void _dpx_peer_free(dpx_peer *p) {
 	free(p);
 }
 
-// FIXME this isn't threadsafe (taskcreate is called)
-dpx_peer* _dpx_peer_new() {
+dpx_peer* _dpx_peer_new(dpx_context *context) {
 	dpx_peer* peer = (dpx_peer*) malloc(sizeof(dpx_peer));
 
 	peer->lock = (QLock*) calloc(1, sizeof(QLock));
+	peer->context = context;
 
 	peer->listeners = NULL;
 	peer->conns = NULL;
