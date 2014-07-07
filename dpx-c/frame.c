@@ -26,12 +26,12 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	else
 		frame->channel = DPX_FRAME_NOCH;
 
-	frame->method = NULL;
+	frame->method = "";
 	frame->headers = NULL;
-	frame->error = NULL;
+	frame->error = "";
 	frame->last = 0;
 
-	frame->payload = NULL;
+	frame->payload = "";
 	frame->payloadSize = 0;
 
 	return frame;
@@ -40,6 +40,8 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 // ----------------------------------------------------------------------------
 
 dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
+	msgpack_object_print(stdout, *obj);
+	puts("");
 	msgpack_object_array arr = obj->via.array;
 
 	assert(arr.size == DPX_PACK_ARRAY_SIZE);

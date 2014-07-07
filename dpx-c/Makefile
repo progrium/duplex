@@ -17,7 +17,7 @@ OFILES=\
 	dpx.o
 
 CC=gcc
-CFLAGS=-Wall -I. -Ilibtask -ggdb -ltask -lmsgpack -pthread
+CFLAGS=-Wall -I. -Ilibtask -ggdb -Llibtask -ltask -lmsgpack -pthread
 
 %.o: %.c
 	$(CC) $(CFLAGS) -fPIC -c $*.c

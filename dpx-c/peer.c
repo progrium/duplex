@@ -84,11 +84,8 @@ int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) {
 }
 
 void* _dpx_peer_accept_helper(void* v) {
-	printf("12-3\n");
 	dpx_peer *p = (dpx_peer*) v;
-	printf("12-4\n");
 	dpx_channel* ch = _dpx_peer_accept(p);
-	printf("12-5\n");
 	return ch;
 }
 
@@ -97,8 +94,6 @@ dpx_channel* dpx_peer_accept(dpx_peer *p) {
 	a.function = &_dpx_peer_accept_helper;
 	a.args = p;
 
-	printf("12-1\n");
-	printf("12-2\n");
 	void* ret = _dpx_joinfunc(&a);
 	
 	return (dpx_channel*)ret;
@@ -215,13 +210,13 @@ dpx_peer* _dpx_peer_new() {
 	peer->listeners = NULL;
 	peer->conns = NULL;
 
-	peer->openFrames = chancreate(sizeof(dpx_frame), DPX_CHANNEL_QUEUE_HWM);
-	peer->incomingChannels = chancreate(sizeof(dpx_channel), 1024);
+	peer->openFrames = chancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
+	peer->incomingChannels = chancreate(sizeof(dpx_channel*), 1024);
 
 	peer->closed = 0;
 	peer->rrIndex = 0;
 	peer->chanIndex = 0;
-	peer->index = 0;
+	peer->index = _dpx_peer_index;
 
 	peer->firstConn = chancreate(sizeof(char), 0);
 
@@ -287,6 +282,7 @@ int _dpx_peer_connlen(dpx_peer *p) {
 }
 
 void _dpx_peer_route_open_frames(dpx_peer *p) {
+	taskname("_dpx_peer_route_open_frames_%d", index);
 	DPX_ERROR err = DPX_ERROR_NONE;
 	dpx_frame* frame = NULL;
 
@@ -302,7 +298,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 			}
 			dpx_duplex_conn* conn;
 			int index = _dpx_peer_next_conn(p, &conn);
-			printf("Sending frame [%d]: %d bytes\n", index, frame->payloadSize);
+			printf("(%d) Sending frame [%d]: %d bytes\n", p->index, index, frame->payloadSize);
 			err = _dpx_duplex_conn_write_frame(conn, frame);
 			if (err == DPX_ERROR_NONE)
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
@@ -352,7 +348,7 @@ dpx_channel* _dpx_peer_accept(dpx_peer *p) {
 		return NULL;
 	// FIXME we can't detect a channel we close... or can we?
 	dpx_channel* chan;
-	if (!chanrecv(p->incomingChannels, &chan)) {
+	if (chanrecv(p->incomingChannels, &chan) == -1) {
 		fprintf(stderr, "failed to accept incoming channel\n");
 		return NULL;
 	}
@@ -524,7 +520,7 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 		l->next = add;
 	}
 
-	printf("Now listening on %s:%d\n", addr, port);
+	printf("(%d) Now listening on %s:%d\n", p->index, addr, port);
 
 	struct _dpx_peer_bind_task_param *param = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
 	param->p = p;

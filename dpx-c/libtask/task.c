@@ -4,7 +4,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-int	taskdebuglevel;
+int	taskdebuglevel = 0;
 int	taskcount;
 int	tasknswitch;
 int	taskexitval;
@@ -26,13 +26,14 @@ taskdebug(char *fmt, ...)
 	char buf[128];
 	Task *t;
 	char *p;
-	static int fd = -1;
+	static int fd = 2;
 
-return;
+	if (!taskdebuglevel)
+		return;
+
 	va_start(arg, fmt);
 	vfprint(1, fmt, arg);
 	va_end(arg);
-return;
 
 	if(fd < 0){
 		p = strrchr(argv0, '/');

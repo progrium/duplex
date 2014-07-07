@@ -7,7 +7,7 @@ dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd) {
 	c->lock = (QLock*) calloc(1, sizeof(QLock));
 	c->peer = p;
 	c->connfd = fd;
-	c->writeCh = chancreate(sizeof(dpx_frame), 0);
+	c->writeCh = chancreate(sizeof(dpx_frame*), 0);
 	c->channels = NULL;
 
 	fdnoblock(c->connfd);
@@ -34,6 +34,7 @@ void _dpx_duplex_conn_free(dpx_duplex_conn *c) {
 
 void _dpx_duplex_conn_read_frames(void *v) {
 	dpx_duplex_conn *c = v;
+	taskname("_dpx_duplex_conn_read_frames (peer %d)", c->peer->index);
 	// FIXME make sure conn is open (see libtask netaccept and fdopen())
 
 	char buf[DPX_DUPLEX_CONN_CHUNK];
@@ -62,6 +63,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 			HASH_FIND_INT(c->channels, &frame->channel, channel);
 
 			qunlock(c->lock);
+			printf("channel = %p, frame->channel = %d, frame->type = %d\n", channel, frame->channel, frame->type);
 			if (channel != NULL && frame->type == DPX_FRAME_DATA) {
 				if (_dpx_channel_handle_incoming(channel->value, frame))
 					continue;
@@ -81,6 +83,8 @@ void _dpx_duplex_conn_read_frames(void *v) {
 }
 
 void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
+	taskname("_dpx_duplex_conn_write_frames (peer %d)", c->peer->index);
+
 	while(1) {
 		if (c->writeCh == NULL)
 			return;
@@ -107,6 +111,7 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 }
 
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
+	printf("conn: %p, frame: %p\n", c, frame);
 	chansend(c->writeCh, &frame);
 	return chanrecvul(frame->errCh);
 }
@@ -122,7 +127,7 @@ void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	if (old != NULL)
 		free(old);
 
-	chansend(ch->connCh, c);
+	chansend(ch->connCh, &c);
 	qunlock(c->lock);
 }
 
