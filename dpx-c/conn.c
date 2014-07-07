@@ -46,7 +46,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 	msgpack_unpacker_init(&unpacker, DPX_DUPLEX_CONN_BUFFER);
 	msgpack_unpacked_init(&result);
 
-	while((read_size = fdread(c->connfd, buf, DPX_DUPLEX_CONN_CHUNK)) > 0) {
+	while((read_size = fdread1(c->connfd, buf, DPX_DUPLEX_CONN_CHUNK)) > 0) {
 		msgpack_unpacker_reserve_buffer(&unpacker, read_size);
 		memcpy(msgpack_unpacker_buffer(&unpacker), buf, read_size);
 		msgpack_unpacker_buffer_consumed(&unpacker, read_size);
@@ -63,6 +63,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 			HASH_FIND_INT(c->channels, &frame->channel, channel);
 
 			qunlock(c->lock);
+			
 			printf("channel = %p, frame->channel = %d, frame->type = %d\n", channel, frame->channel, frame->type);
 			if (channel != NULL && frame->type == DPX_FRAME_DATA) {
 				if (_dpx_channel_handle_incoming(channel->value, frame))
@@ -74,7 +75,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 					continue;
 				}
 			}
-			printf("dropped frame, size %d", frame->payloadSize);
+			printf("(%d) dropped frame, size %d", c->peer->index, frame->payloadSize);
 			dpx_frame_free(frame);
 		}
 	}
@@ -111,7 +112,7 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 }
 
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
-	printf("conn: %p, frame: %p\n", c, frame);
+	//printf("conn: %p, frame: %p\n", c, frame);
 	chansend(c->writeCh, &frame);
 	return chanrecvul(frame->errCh);
 }
