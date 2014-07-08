@@ -172,45 +172,39 @@ void* test_dpx_receive(void* v) {
 }
 
 START_TEST(test_dpx_rpc_call) {
-	pid_t pid;
 
-	pid = fork();
+	dpx_context *server_context = dpx_init();
 
-	if (pid < 0) {
-		ck_assert_msg(0, "failed to fork, which is necessary for this test.");
+	dpx_peer* server = dpx_peer_new(server_context);
+	ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to bind.");
+
+	pthread_t server_thread;
+
+	pthread_create(&server_thread, NULL, &test_dpx_receive, server);
+	pthread_detach(server_thread);
+
+	dpx_context *client_context = dpx_init();
+
+	dpx_peer* client = dpx_peer_new(client_context);
+	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to connect.");
+
+	char* payload = "123";
+
+	char* receive;
+	int receive_size;
+	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
+
+	if (strncmp(receive, "321", 3)) {
+		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
 	}
 
-	if (pid == 0) { // child
-		dpx_context *c = dpx_init();
+	pthread_cancel(server_thread);
 
-		dpx_peer* server = dpx_peer_new(c);
-		ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to bind.");
+	dpx_peer_close(client);
+	dpx_cleanup(client_context);
 
-		test_dpx_receive(server);
-
-		dpx_peer_close(server);
-		dpx_cleanup(c);
-	} else {
-		dpx_context *c = dpx_init();
-
-		dpx_peer* client = dpx_peer_new(c);
-		ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to connect.");
-
-		char* payload = "123";
-
-		char* receive;
-		int receive_size;
-		test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
-
-		if (strncmp(receive, "321", 3)) {
-			ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
-		}
-
-		kill(pid, SIGKILL); // kill the child, cause I don't care about it anymore.
-
-		dpx_peer_close(client);
-		dpx_cleanup(c);
-	}
+	dpx_peer_close(server);
+	dpx_cleanup(server_context);
 
 } END_TEST
 
@@ -220,13 +214,13 @@ dpx_suite_core(void)
 	Suite *s = suite_create("DPX-C Core");
 
 	TCase *tc_core = tcase_create("Basic Functions");
-	tcase_add_test(tc_core, test_dpx_init);
-	tcase_add_test(tc_core, test_dpx_thread_communication);
+	//tcase_add_test(tc_core, test_dpx_init);
+	//tcase_add_test(tc_core, test_dpx_thread_communication);
 
 	suite_add_tcase(s, tc_core);
 
 	TCase *tc_peer = tcase_create("Peer Functions");
-	tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
+	//tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
 	tcase_add_test(tc_peer, test_dpx_rpc_call);
 
 	suite_add_tcase(s, tc_peer);
