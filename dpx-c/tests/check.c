@@ -216,6 +216,173 @@ START_TEST(test_dpx_rpc_call) {
 
 } END_TEST
 
+struct _test_dri {
+	dpx_peer* server;
+	char id;
+};
+
+void* test_dpx_receive_id(void* v) {
+	struct _test_dri *t = v;
+	dpx_peer* server = t->server;
+	char addto = t->id;
+
+	printf("ADDTO: %c\n", addto);
+
+	// because this causes issues?? FIXME
+	//pthread_cleanup_push(_test_dpx_receive_cleanup, server);
+
+	while (1) {
+		dpx_channel* chan = dpx_peer_accept(server);
+		printf("method: %s\n", dpx_channel_method_get(chan));
+		if (chan != NULL && !strcmp(dpx_channel_method_get(chan), "foo")) {
+			dpx_frame* req = dpx_channel_receive_frame(chan);
+			dpx_frame* resp = dpx_frame_new(chan);
+			resp->payload = test_dpx_reverse(req->payload, req->payloadSize);
+			resp->payloadSize = req->payloadSize + 1;
+
+			resp->payload = realloc(resp->payload, resp->payloadSize);
+			*(resp->payload + 3) = addto;
+
+			printf("payload: %.*s, payload size: %d\n", 4, resp->payload, resp->payloadSize);
+			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
+		}
+	}
+}
+
+START_TEST(test_dpx_round_robin_async) {
+
+	dpx_context *client_context = dpx_init();
+	dpx_peer *client = dpx_peer_new(client_context);
+
+	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9876) == DPX_ERROR_NONE, "client failed to queue connect to 9876");
+	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9875) == DPX_ERROR_NONE, "client failed to queue connect to 9875");
+	ck_assert_msg(dpx_peer_bind(client, "127.0.0.1", 9874) == DPX_ERROR_NONE, "client failed to queue bind to 9874");
+
+	dpx_context *server1context = dpx_init();
+	dpx_peer* server1 = dpx_peer_new(server1context);
+	ck_assert_msg(dpx_peer_bind(server1, "127.0.0.1", 9876) == DPX_ERROR_NONE, "server1 failed to queue bind to 9876");
+
+	struct _test_dri *t1 = malloc(sizeof(struct _test_dri));
+	t1->server = server1;
+	t1->id = '1';
+
+	pthread_t server1thread;
+	pthread_create(&server1thread, NULL, &test_dpx_receive_id, t1);
+	pthread_detach(server1thread);
+
+	dpx_context *server2context = dpx_init();
+	dpx_peer* server2 = dpx_peer_new(server2context);
+	ck_assert_msg(dpx_peer_bind(server2, "127.0.0.1", 9875) == DPX_ERROR_NONE, "server2 failed to queue bind to 9875");
+
+	struct _test_dri *t2 = malloc(sizeof(struct _test_dri));
+	t2->server = server2;
+	t2->id = '2';
+
+	pthread_t server2thread;
+	pthread_create(&server2thread, NULL, &test_dpx_receive_id, t2);
+	pthread_detach(server2thread);
+
+	dpx_context *server3context = dpx_init();
+	dpx_peer* server3 = dpx_peer_new(server3context);
+	ck_assert_msg(dpx_peer_connect(server3, "127.0.0.1", 9874) == DPX_ERROR_NONE, "server3 failed to queue connect to 9874");
+
+	struct _test_dri *t3 = malloc(sizeof(struct _test_dri));
+	t3->server = server3;
+	t3->id = '3';
+
+	pthread_t server3thread;
+	pthread_create(&server3thread, NULL, &test_dpx_receive_id, t3);
+	pthread_detach(server3thread);
+
+	char* payload = "123";
+
+	char* receive;
+	int receive_size;
+
+	char servers_checked[4];
+
+	// first server
+	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
+	if (strncmp(receive, "321", 3)) {
+		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
+	}
+	servers_checked[0] = *(receive + 3);
+	free(receive);
+
+	// second
+	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
+	if (strncmp(receive, "321", 3)) {
+		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
+	}
+	servers_checked[1] = *(receive + 3);
+	free(receive);
+
+	// third
+	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
+	if (strncmp(receive, "321", 3)) {
+		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
+	}
+	servers_checked[2] = *(receive + 3);
+	free(receive);
+
+	// first again
+	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
+	if (strncmp(receive, "321", 3)) {
+		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
+	}
+	servers_checked[3] = *(receive + 3);
+	free(receive);
+
+	if (memchr(servers_checked, '1', 4) == NULL)
+		ck_abort_msg("failed to visit server 1");
+	if (memchr(servers_checked, '2', 4) == NULL)
+		ck_abort_msg("failed to visit server 2");
+	if (memchr(servers_checked, '2', 4) == NULL)
+		ck_abort_msg("failed to visit server 3");
+
+	pthread_cancel(server1thread);
+	pthread_cancel(server2thread);
+	pthread_cancel(server3thread);
+
+	dpx_peer_close(client);
+	dpx_cleanup(client_context);
+
+} END_TEST
+
+START_TEST(test_dpx_async_messaging) {
+
+	dpx_context *client_context = dpx_init();
+
+	dpx_peer* client = dpx_peer_new(client_context);
+	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to connect.");
+
+	dpx_context *server_context = dpx_init();
+
+	dpx_peer* server = dpx_peer_new(server_context);
+	ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to bind.");
+
+	pthread_t server_thread;
+
+	pthread_create(&server_thread, NULL, &test_dpx_receive, server);
+	pthread_detach(server_thread);
+
+	char* payload = "123";
+
+	char* receive;
+	int receive_size;
+	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
+
+	if (strncmp(receive, "321", 3)) {
+		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
+	}
+
+	pthread_cancel(server_thread);
+
+	dpx_peer_close(client);
+	dpx_cleanup(client_context);
+
+} END_TEST
+
 Suite*
 dpx_suite_core(void)
 {
@@ -232,6 +399,13 @@ dpx_suite_core(void)
 	tcase_add_test(tc_peer, test_dpx_rpc_call);
 
 	suite_add_tcase(s, tc_peer);
+
+	TCase *tc_async = tcase_create("Async Functions");
+	tcase_add_test(tc_async, test_dpx_round_robin_async);
+	tcase_add_test(tc_async, test_dpx_async_messaging);
+	tcase_set_timeout(tc_async, 10);
+
+	suite_add_tcase(s, tc_async);
 
 	return s;
 }

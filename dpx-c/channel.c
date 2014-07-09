@@ -145,6 +145,11 @@ dpx_channel* _dpx_channel_new() {
 
 void _dpx_channel_free(dpx_channel* c) {
 	_dpx_channel_close(c, DPX_ERROR_FREEING);
+
+	chanfree(c->connCh);
+	chanfree(c->incoming);
+	chanfree(c->outgoing);
+
 	free(c->lock);
 	free(c->method);
 	free(c);
@@ -193,12 +198,9 @@ void _dpx_channel_close(dpx_channel *c, DPX_ERROR err) {
 
 	_dpx_duplex_conn_unlink_channel(c->conn, c);
 
-	chanfree(c->connCh);
-	c->connCh = NULL;
-	chanfree(c->incoming);
-	c->incoming = NULL;
-	chanfree(c->outgoing);
-	c->outgoing = NULL;
+	chanclose(c->connCh);
+	chanclose(c->incoming);
+	chanclose(c->outgoing);
 
 _dpx_channel_close_cleanup:
 	ltunlock(c->lock);
@@ -308,54 +310,49 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 	lthread_detach();
 
 	printf("(%d) Pumping started for channel %d\n", c->peer->index, c->id);
+	chanrecv(c->connCh, &c->conn);
+	printf("(%d) Received initial connection for channel %d\n", c->peer->index, c->id);
+
 	while(1) {
 
-		if (c->connCh == NULL) {
-			c->conn = NULL;
-			goto _dpx_channel_pump_outgoing_cleanup;
-		}
-
-		dpx_duplex_conn* conn;
-		int hasConn = chanrecv(c->connCh, &conn);
+		dpx_duplex_conn *conn;
+		int hasConn = channbrecv(c->connCh, &conn);
 		if (hasConn == LTCHAN_CLOSED)
 			goto _dpx_channel_pump_outgoing_cleanup;
-
-		c->conn = conn;
-
-		if (c->outgoing == NULL) {
-			goto _dpx_channel_pump_outgoing_cleanup;
-		}
+		else if (hasConn != LTCHAN_NONE)
+			c->conn = conn;
 
 		dpx_frame *frame;
-
-		int hasFrame = chanrecv(c->outgoing, &frame);
+		int hasFrame = channbrecv(c->outgoing, &frame);
 		if (hasFrame == LTCHAN_CLOSED)
 			goto _dpx_channel_pump_outgoing_cleanup;
+		else if (hasFrame != LTCHAN_NONE) {
+			while(1) {
+				printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
+				DPX_ERROR err = _dpx_duplex_conn_write_frame(c->conn, frame);
+				if (err) {
+					printf("(%d) Error sending frame: %lu\n", c->peer->index, err);
 
-		while(1) {
-			printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
-			DPX_ERROR err = _dpx_duplex_conn_write_frame(c->conn, frame);
-			if (err) {
-				printf("(%d) Error sending frame: %lu\n", c->peer->index, err);
-
-				if (chanrecv(c->connCh, &c->conn) == LTCHAN_CLOSED) {
-					c->conn = NULL;
-					goto _dpx_channel_pump_outgoing_cleanup;
+					if (chanrecv(c->connCh, &c->conn) == LTCHAN_CLOSED)
+						goto _dpx_channel_pump_outgoing_cleanup;
+					
+					continue;
 				}
-				
-				continue;
+				if (strcmp(frame->error, "")) {
+					_dpx_channel_close(c, DPX_ERROR_CHAN_FRAME);
+				} else if (frame->last && c->server) {
+					_dpx_channel_close(c, DPX_ERROR_NONE);
+				}
+				break;
 			}
-			if (strcmp(frame->error, "")) {
-				_dpx_channel_close(c, DPX_ERROR_CHAN_FRAME);
-			} else if (frame->last && c->server) {
-				_dpx_channel_close(c, DPX_ERROR_NONE);
-			}
-			break;
 		}
+
+		lthread_sleep(50);
 	}
 
 _dpx_channel_pump_outgoing_cleanup:
 	printf("(%d) Pumping finished for channel %d\n", c->peer->index, c->id);
+	c->conn = NULL;
 }
 
 char* _dpx_channel_method_set(dpx_channel *c, char* method) {
