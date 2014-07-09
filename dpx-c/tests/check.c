@@ -153,8 +153,19 @@ void test_dpx_call(dpx_peer* peer, char* method, char* payload, int payload_size
 	dpx_frame_free(resp);
 }
 
+void* _test_dpx_receive_cleanup(void* v) {
+	dpx_peer* server = v;
+
+	dpx_context *server_context = server->context;
+	dpx_peer_close(server);
+	dpx_cleanup(server_context);
+}
+
 void* test_dpx_receive(void* v) {
 	dpx_peer* server = v;
+
+	// because this causes issues?? FIXME
+	//pthread_cleanup_push(_test_dpx_receive_cleanup, v);
 
 	while (1) {
 		dpx_channel* chan = dpx_peer_accept(server);
@@ -169,10 +180,6 @@ void* test_dpx_receive(void* v) {
 			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
 		}
 	}
-
-	dpx_context *server_context = server->context;
-	dpx_peer_close(server);
-	dpx_cleanup(server_context);
 }
 
 START_TEST(test_dpx_rpc_call) {
