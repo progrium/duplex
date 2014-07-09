@@ -52,24 +52,36 @@ void* _dpx_joinfunc(dpx_context *c, _dpx_a *a) {
 void _dpx_libtask_checker(void* v) {
 	dpx_context *c = v;
 
-	taskname("dpx_libtask_checker_%s", c->name);
+	lthread_detach();
+	DEFINE_LTHREAD;
+	//taskname("dpx_libtask_checker_%s", c->name);
 	
 	if (listen(c->task_sock, DPX_SOCK_LIMIT) == -1) {
 		fprintf(stderr, "failed to listen");
-		return;
+		abort();
 	}
+
+	int again = 0;
 
 	while(1) {
 		int remotesd;
 
 		if ((remotesd = sockaccept(c->task_sock)) == -1) {
-			fprintf(stderr, "failed to accept\n");
-			return;
+			if (!again) {
+				fprintf(stderr, "failed to accept, trying again\n");
+				again = 1;
+				continue;
+			} else {
+				fprintf(stderr, "failed to accept again, context exiting\n");
+				return;
+			}
 		}
+
+		again = 0;
 
 		_dpx_a *ptr = NULL;
 
-		int res = fdread1(remotesd, &ptr, sizeof(void*));
+		int res = lthread_read(remotesd, &ptr, sizeof(void*), 0);
 		if (res != sizeof(void*)) {
 			fprintf(stderr, "failed to handle read\n");
 			abort(); // FIXME ?
@@ -77,7 +89,7 @@ void _dpx_libtask_checker(void* v) {
 
 		void* result = ptr->function(ptr->args);
 
-		if (fdwrite(remotesd, &result, sizeof(void*)) != sizeof(void*)) {
+		if (lthread_write(remotesd, &result, sizeof(void*)) != sizeof(void*)) {
 			fprintf(stderr, "failed to write back result\n");
 			abort(); // FIXME ?
 		}
@@ -88,9 +100,12 @@ void _dpx_libtask_checker(void* v) {
 
 // +thread libtask
 void* _dpx_libtask_thread(void* v) {
-	taskinit(&_dpx_libtask_checker, v);
+	lthread_t *lt = NULL;
 
-	fprintf(stderr, "libtask thread ended unexpectedly");
+	lthread_create(&lt, &_dpx_libtask_checker, v);
+	lthread_run();
+
+	fprintf(stderr, "lthread thread ended unexpectedly");
 	abort();
 	return NULL;
 }

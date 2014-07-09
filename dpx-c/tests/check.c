@@ -169,6 +169,10 @@ void* test_dpx_receive(void* v) {
 			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
 		}
 	}
+
+	dpx_context *server_context = server->context;
+	dpx_peer_close(server);
+	dpx_cleanup(server_context);
 }
 
 START_TEST(test_dpx_rpc_call) {
@@ -203,9 +207,6 @@ START_TEST(test_dpx_rpc_call) {
 	dpx_peer_close(client);
 	dpx_cleanup(client_context);
 
-	dpx_peer_close(server);
-	dpx_cleanup(server_context);
-
 } END_TEST
 
 Suite*
@@ -214,13 +215,13 @@ dpx_suite_core(void)
 	Suite *s = suite_create("DPX-C Core");
 
 	TCase *tc_core = tcase_create("Basic Functions");
-	//tcase_add_test(tc_core, test_dpx_init);
-	//tcase_add_test(tc_core, test_dpx_thread_communication);
+	tcase_add_test(tc_core, test_dpx_init);
+	tcase_add_test(tc_core, test_dpx_thread_communication);
 
 	suite_add_tcase(s, tc_core);
 
 	TCase *tc_peer = tcase_create("Peer Functions");
-	//tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
+	tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
 	tcase_add_test(tc_peer, test_dpx_rpc_call);
 
 	suite_add_tcase(s, tc_peer);
