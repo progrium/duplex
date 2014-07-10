@@ -1,8 +1,6 @@
-# Duplex 
+# Duplex ![Coverity Scan Build Status](https://scan.coverity.com/projects/2512/badge.svg)
 
 Duplex is a simple, efficient, extensible application communications protocol and library. It's heavily inspired by ZeroMQ and BERT-RPC, but draws influence from Twitter Finagle, HTTP/2, zerorpc, and Unix pipes.
-
-Currently for #golang, the core (dpx) is intended to be rewritten in C using libtask to make it available to most other languages. 
 
 ## Features
 
@@ -23,6 +21,35 @@ Although heavily inpsired by ZeroMQ and nanomsg, here are reasons it doesn't use
  * Writing multiplexing on top of ZeroMQ adds complexity and mostly ignores its messaging patterns (as seen in zerorpc)
 
 In short, the messaging abstractions work against the goals of Duplex. However there are many great features that Duplex emulates, mostly to employ the overall distributed / edge messaging philosophy, and building in connection pools, reconnect logic, edge queuing, and optimizing for high-throughput async usage.
+
+## Implementations
+
+### Reference Implementation (dpx-ref)
+
+Prototyped in Go. It is currently usable. Simply `go get -u github.com/robxu9/duplex/dpx-ref`.
+
+### C Implementation (dpx-c)
+
+Alpha status, not tested in production. Use at your own risk, report lots of bugs for fixing.
+
+The basic workflow for using `dpx-c` is the following:
+
+* Initialise a worker context, so that all operations happen on the worker thread: `dpx_context *c = dpx_init();`
+* Initialise a peer that will utilise that context: `dpx_peer *p = dpx_peer_new(c);`
+* Report lots of bugs.
+
+#### Requirements:
+
+* [lthread](https://github.com/halayli/lthread)
+* [ltchan](https://github.com/robxu9/ltchan)
+* [msgpack-c](https://github.com/msgpack/msgpack-c)
+* For testing: [check](http://check.sourceforge.net)
+
+Compile with `make`, test with `make check`, install with `make install`.
+
+### Go Implemntation via cgo (dpx-go)
+
+Not usable yet.
 
 ## Roadmap
 
