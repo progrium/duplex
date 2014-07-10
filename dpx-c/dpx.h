@@ -1,3 +1,4 @@
+#include <ltchan.h>
 #include "uthash.h"
 
 // ---------------------------- { threadsafe api } ----------------------------
