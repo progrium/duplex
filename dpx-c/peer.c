@@ -403,6 +403,7 @@ void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
 	}
 
 _dpx_peer_connect_task_cleanup:
+	free(param->addr);
 	free(param);
 }
 
@@ -415,9 +416,12 @@ DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port) {
 		goto _dpx_peer_connect_cleanup;
 	}
 
+	char* addrcpy = malloc(strlen(addr) + 1);
+	strcpy(addrcpy, addr);
+
 	struct _dpx_peer_connect_task_param *param = (struct _dpx_peer_connect_task_param*) malloc(sizeof(struct _dpx_peer_connect_task_param));
 	param->p = p;
-	param->addr = addr;
+	param->addr = addrcpy;
 	param->port = port;
 
 	lthread_t *lt;
