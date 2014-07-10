@@ -333,7 +333,7 @@ START_TEST(test_dpx_round_robin_async) {
 		ck_abort_msg("failed to visit server 1");
 	if (memchr(servers_checked, '2', 4) == NULL)
 		ck_abort_msg("failed to visit server 2");
-	if (memchr(servers_checked, '2', 4) == NULL)
+	if (memchr(servers_checked, '3', 4) == NULL)
 		ck_abort_msg("failed to visit server 3");
 
 	pthread_cancel(server1thread);
