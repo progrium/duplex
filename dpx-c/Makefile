@@ -39,7 +39,7 @@ check: all
 install: $(SHARED) $(STATIC)
 	cp $(SHARED) $(DESTDIR)$(PREFIX)/lib
 	cp $(STATIC) $(DESTDIR)$(PREFIX)/lib
-	cp *.h $(DESTDIR)$(PREFIX)/include
+	cp dpx.h $(DESTDIR)$(PREFIX)/include
 
 dist: clean
 	git archive --format=tar --prefix=$(NAME)-$(VERSION)/ HEAD | xz -9v > $(NAME)-$(VERSION).tar.xz
