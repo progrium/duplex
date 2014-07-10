@@ -1,7 +1,8 @@
+#include <ltchan.h>
+#include <lthread.h>
 #include <msgpack.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <task.h>
 #include <unistd.h>
 
 #include "dpx.h"
@@ -11,6 +12,9 @@
 
 // ------------------------------- { constants } ------------------------------
 #define DPX_TASK_STACK_SIZE 65536
+
+#define UDP 0
+#define TCP 1
 
 // -------------------------------- { errors } --------------------------------
 // [ declarations have been moved to dpx.h in order for clients to utilise it ]
@@ -40,6 +44,13 @@ typedef struct _dpx_frame dpx_frame;
 struct _dpx_peer;
 typedef struct _dpx_peer dpx_peer;
 
+// ----------------------------- { network ops } ------------------------------
+int netannounce(int istcp, char *server, int port);
+int netaccept(int fd, char *server, int *port);
+int sockaccept(int fd);
+int netlookup(char *name, uint32_t *ip);
+int netdial(int istcp, char *server, int port);
+
 // --------------------------------- { peer } ---------------------------------
 #define DPX_PEER_RETRYMS 1000
 #define DPX_PEER_RETRYATTEMPTS 20
@@ -61,7 +72,7 @@ struct _dpx_peer_connection {
 typedef struct _dpx_peer_connection dpx_peer_connection;
 
 struct _dpx_peer {
-	QLock *lock;
+	LtLock *lock;
 	dpx_context *context;
 	
 	dpx_peer_listener *listeners; // listener fds
@@ -93,7 +104,7 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port);
 #define DPX_CHANNEL_QUEUE_HWM 1024
 
 struct _dpx_channel {
-	QLock *lock;
+	LtLock *lock;
 	int id;
 	dpx_peer *peer;
 	Channel *connCh;
@@ -146,7 +157,7 @@ struct dpx_channel_map {
 typedef struct dpx_channel_map dpx_channel_map;
 
 struct _dpx_duplex_conn {
-	QLock *lock;
+	LtLock *lock;
 	dpx_peer *peer;
 	int connfd;
 	Channel* writeCh;

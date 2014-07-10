@@ -203,7 +203,7 @@ void _dpx_peer_free(dpx_peer *p) {
 dpx_peer* _dpx_peer_new(dpx_context *context) {
 	dpx_peer* peer = (dpx_peer*) malloc(sizeof(dpx_peer));
 
-	peer->lock = (QLock*) calloc(1, sizeof(QLock));
+	peer->lock = ltlockcreate();
 	peer->context = context;
 
 	peer->listeners = NULL;
@@ -221,17 +221,20 @@ dpx_peer* _dpx_peer_new(dpx_context *context) {
 
 	_dpx_peer_index += 1;
 
-	taskcreate(&_dpx_peer_route_open_frames, peer, DPX_TASK_STACK_SIZE);
+	lthread_t *lt;
+	lthread_create(&lt, &_dpx_peer_route_open_frames, peer);
 	return peer;
 }
 
 void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 	dpx_duplex_conn* dc = _dpx_duplex_conn_new(p, fd);
-	qlock(p->lock);
+	ltlock(p->lock);
 
-	dpx_peer_connection* add = (dpx_peer_connection*) malloc(sizeof(dpx_peer_connection));
+	dpx_peer_connection* add = malloc(sizeof(dpx_peer_connection));
 	add->conn = dc;
 	add->next = NULL;
+
+	printf("(%d) Accepting connection.\n", p->index);
 
 	dpx_peer_connection* conn = p->conns;
 	if (conn == NULL) {
@@ -243,33 +246,12 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 		conn->next = add;
 	}
 
-	qunlock(p->lock);
+	ltunlock(p->lock);
 
-	taskcreate(&_dpx_duplex_conn_read_frames, dc, DPX_TASK_STACK_SIZE);
-	taskcreate(&_dpx_duplex_conn_write_frames, dc, DPX_TASK_STACK_SIZE);
-}
+	lthread_t *lt;
 
-int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
-	int connlen = 0;
-	dpx_peer_connection *tmp;
-	for (tmp=p->conns; tmp != NULL; tmp=tmp->next)
-		connlen++;
-
-	assert(connlen != 0);
-
-	int index = p->rrIndex % connlen;
-	qlock(p->lock);
-
-	int i = 0;
-	for (tmp=p->conns; i < index; tmp=tmp->next)
-		i++;
-
-	p->rrIndex++;
-
-	qunlock(p->lock);
-
-	*conn = tmp->conn;
-	return index;
+	lthread_create(&lt, &_dpx_duplex_conn_read_frames, dc);
+	lthread_create(&lt, &_dpx_duplex_conn_write_frames, dc);
 }
 
 int _dpx_peer_connlen(dpx_peer *p) {
@@ -280,24 +262,47 @@ int _dpx_peer_connlen(dpx_peer *p) {
 	return connlen;
 }
 
+int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
+	int connlen = _dpx_peer_connlen(p);
+
+	assert(connlen != 0);
+
+	int index = p->rrIndex % connlen;
+	ltlock(p->lock);
+
+	dpx_peer_connection *tmp;
+	int i = 0;
+	for (tmp=p->conns; i < index; tmp=tmp->next)
+		i++;
+
+	p->rrIndex++;
+
+	ltunlock(p->lock);
+
+	*conn = tmp->conn;
+	return index;
+}
+
 void _dpx_peer_route_open_frames(dpx_peer *p) {
-	taskname("_dpx_peer_route_open_frames_%d", index);
+	DEFINE_LTHREAD;
+	lthread_detach();
+	//taskname("_dpx_peer_route_open_frames_%d", index);
 	DPX_ERROR err = DPX_ERROR_NONE;
 	dpx_frame* frame = NULL;
 
 	while(1) {
 		chanrecvp(p->firstConn); // we don't care about the ret value
-		printf("First connection, routing... [index %d]\n", p->index);
+		printf("(%d) First connection, routing...\n", p->index);
 
 		while (_dpx_peer_connlen(p) > 0) {
 			if (err == DPX_ERROR_NONE) {
-				if (p->openFrames == NULL)
+				if (chanrecv(p->openFrames, &frame) == LTCHAN_CLOSED)
 					return;
-				chanrecv(p->openFrames, &frame);
 			}
+
 			dpx_duplex_conn* conn;
 			int index = _dpx_peer_next_conn(p, &conn);
-			printf("(%d) Sending frame [%d]: %d bytes\n", p->index, index, frame->payloadSize);
+			printf("(%d) Sending OPEN frame [%d]: %d bytes\n", p->index, index, frame->payloadSize);
 			err = _dpx_duplex_conn_write_frame(conn, frame);
 			if (err == DPX_ERROR_NONE)
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
@@ -306,7 +311,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 }
 
 dpx_channel* _dpx_peer_open(dpx_peer *p, char *method) {
-	qlock(p->lock);
+	ltlock(p->lock);
 	dpx_channel* ret = NULL;
 
 	if (p->closed)
@@ -321,12 +326,12 @@ dpx_channel* _dpx_peer_open(dpx_peer *p, char *method) {
 	chansend(p->openFrames, &frame);
 
 _dpx_peer_open_cleanup:
-	qunlock(p->lock);
+	ltunlock(p->lock);
 	return ret;
 }
 
 int _dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) {
-	qlock(p->lock);
+	ltlock(p->lock);
 	int ret = 0;
 
 	if (p->closed)
@@ -338,7 +343,7 @@ int _dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) 
 	ret = 1;
 
 _dpx_peer_handle_open_cleanup:
-	qunlock(p->lock);
+	ltunlock(p->lock);
 	return ret;
 }
 
@@ -355,7 +360,7 @@ dpx_channel* _dpx_peer_accept(dpx_peer *p) {
 }
 
 DPX_ERROR _dpx_peer_close(dpx_peer *p) {
-	qlock(p->lock);
+	ltlock(p->lock);
 	DPX_ERROR ret = DPX_ERROR_NONE;
 
 	if (p->closed) {
@@ -365,11 +370,9 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 	p->closed = 1;
 
-	chanfree(p->openFrames);
-	p->openFrames = NULL;
+	chanclose(p->openFrames);
 
-	chanfree(p->incomingChannels);
-	p->incomingChannels = NULL;
+	chanclose(p->incomingChannels);
 
 	dpx_peer_listener *l, *nl;
 	for (l=p->listeners; l != NULL; l=nl) {
@@ -387,7 +390,7 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 	}
 
 _dpx_peer_close_cleanup:
-	qunlock(p->lock);
+	ltunlock(p->lock);
 	return ret;
 }
 
@@ -408,6 +411,9 @@ int _dpx_peer_receive_greeting(int connfd) {
 }
 
 void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
+	DEFINE_LTHREAD;
+	lthread_detach();
+
 	dpx_peer *p = param->p;
 	char* addr = param->addr;
 	int port = param->port;
@@ -417,8 +423,9 @@ void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
 		printf("(%d) Connecting to %s:%d\n", p->index, addr, port);
 		int connfd = netdial(TCP, addr, port);
 		if (connfd < 0) {
-			printf("(%d) Failed to connect... Attempt %d/%d.\n", p->index, i+1, DPX_PEER_RETRYATTEMPTS);
-			taskdelay(DPX_PEER_RETRYMS);
+			printf("(%d) Failed to connect to %s:%d... Attempt %d/%d.\n", p->index, addr, port, i+1, DPX_PEER_RETRYATTEMPTS);
+			// FIXME this locks up threads
+			//lthread_sleep(DPX_PEER_RETRYMS);
 			continue;
 		}
 		if (_dpx_peer_send_greeting(connfd) != DPX_ERROR_NONE) {
@@ -436,7 +443,7 @@ _dpx_peer_connect_task_cleanup:
 }
 
 DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port) {
-	qlock(p->lock);
+	ltlock(p->lock);
 	DPX_ERROR ret = DPX_ERROR_NONE;
 
 	if (p->closed) {
@@ -449,10 +456,11 @@ DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port) {
 	param->addr = addr;
 	param->port = port;
 
-	taskcreate(&_dpx_peer_connect_task, param, DPX_TASK_STACK_SIZE);
+	lthread_t *lt;
+	lthread_create(&lt, &_dpx_peer_connect_task, param);
 
 _dpx_peer_connect_cleanup:
-	qunlock(p->lock);
+	ltunlock(p->lock);
 	return ret;
 }
 
@@ -462,6 +470,9 @@ struct _dpx_peer_bind_task_param {
 };
 
 void _dpx_peer_bind_task_accept(struct _dpx_peer_bind_task_param *param) {
+	DEFINE_LTHREAD;
+	lthread_detach();
+
 	if (_dpx_peer_receive_greeting(param->connfd)) {
 		_dpx_peer_accept_connection(param->p, param->connfd);
 	}
@@ -470,6 +481,9 @@ void _dpx_peer_bind_task_accept(struct _dpx_peer_bind_task_param *param) {
 }
 
 void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
+	DEFINE_LTHREAD;
+	lthread_detach();
+
 	dpx_peer *p = param->p;
 	int connfd = param->connfd;
 
@@ -485,14 +499,16 @@ void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
 		struct _dpx_peer_bind_task_param *ap = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
 		ap->p = p;
 		ap->connfd = fd;
-		taskcreate(&_dpx_peer_bind_task_accept, ap, DPX_TASK_STACK_SIZE);
+
+		lthread_t *lt;
+		lthread_create(&lt, &_dpx_peer_bind_task_accept, ap);
 	}
 
 	free(param);
 }
 
 DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port) {
-	qlock(p->lock);
+	ltlock(p->lock);
 	DPX_ERROR ret = DPX_ERROR_NONE;
 
 	if (p->closed) {
@@ -525,9 +541,10 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 	param->p = p;
 	param->connfd = listener;
 
-	taskcreate(&_dpx_peer_bind_task, param, DPX_TASK_STACK_SIZE);
+	lthread_t *lt;
+	lthread_create(&lt, &_dpx_peer_bind_task, param);
 
 _dpx_peer_bind_cleanup:
-	qunlock(p->lock);
+	ltunlock(p->lock);
 	return ret;
 }
