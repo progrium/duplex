@@ -230,9 +230,11 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 	dpx_duplex_conn* dc = _dpx_duplex_conn_new(p, fd);
 	ltlock(p->lock);
 
-	dpx_peer_connection* add = (dpx_peer_connection*) malloc(sizeof(dpx_peer_connection));
+	dpx_peer_connection* add = malloc(sizeof(dpx_peer_connection));
 	add->conn = dc;
 	add->next = NULL;
+
+	printf("(%d) Accepting connection.\n", p->index);
 
 	dpx_peer_connection* conn = p->conns;
 	if (conn == NULL) {
@@ -252,17 +254,23 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 	lthread_create(&lt, &_dpx_duplex_conn_write_frames, dc);
 }
 
-int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
+int _dpx_peer_connlen(dpx_peer *p) {
 	int connlen = 0;
 	dpx_peer_connection *tmp;
 	for (tmp=p->conns; tmp != NULL; tmp=tmp->next)
 		connlen++;
+	return connlen;
+}
+
+int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
+	int connlen = _dpx_peer_connlen(p);
 
 	assert(connlen != 0);
 
 	int index = p->rrIndex % connlen;
 	ltlock(p->lock);
 
+	dpx_peer_connection *tmp;
 	int i = 0;
 	for (tmp=p->conns; i < index; tmp=tmp->next)
 		i++;
@@ -275,14 +283,6 @@ int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
 	return index;
 }
 
-int _dpx_peer_connlen(dpx_peer *p) {
-	int connlen = 0;
-	dpx_peer_connection *tmp;
-	for (tmp=p->conns; tmp != NULL; tmp=tmp->next)
-		connlen++;
-	return connlen;
-}
-
 void _dpx_peer_route_open_frames(dpx_peer *p) {
 	DEFINE_LTHREAD;
 	lthread_detach();
@@ -292,17 +292,17 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 
 	while(1) {
 		chanrecvp(p->firstConn); // we don't care about the ret value
-		printf("First connection, routing... [index %d]\n", p->index);
+		printf("(%d) First connection, routing...\n", p->index);
 
 		while (_dpx_peer_connlen(p) > 0) {
 			if (err == DPX_ERROR_NONE) {
-				if (p->openFrames == NULL)
+				if (chanrecv(p->openFrames, &frame) == LTCHAN_CLOSED)
 					return;
-				chanrecv(p->openFrames, &frame);
 			}
+
 			dpx_duplex_conn* conn;
 			int index = _dpx_peer_next_conn(p, &conn);
-			printf("(%d) Sending frame [%d]: %d bytes\n", p->index, index, frame->payloadSize);
+			printf("(%d) Sending OPEN frame [%d]: %d bytes\n", p->index, index, frame->payloadSize);
 			err = _dpx_duplex_conn_write_frame(conn, frame);
 			if (err == DPX_ERROR_NONE)
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
@@ -370,11 +370,9 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 	p->closed = 1;
 
-	chanfree(p->openFrames);
-	p->openFrames = NULL;
+	chanclose(p->openFrames);
 
-	chanfree(p->incomingChannels);
-	p->incomingChannels = NULL;
+	chanclose(p->incomingChannels);
 
 	dpx_peer_listener *l, *nl;
 	for (l=p->listeners; l != NULL; l=nl) {
@@ -425,8 +423,9 @@ void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
 		printf("(%d) Connecting to %s:%d\n", p->index, addr, port);
 		int connfd = netdial(TCP, addr, port);
 		if (connfd < 0) {
-			printf("(%d) Failed to connect... Attempt %d/%d.\n", p->index, i+1, DPX_PEER_RETRYATTEMPTS);
-			lthread_sleep(DPX_PEER_RETRYMS);
+			printf("(%d) Failed to connect to %s:%d... Attempt %d/%d.\n", p->index, addr, port, i+1, DPX_PEER_RETRYATTEMPTS);
+			// FIXME this locks up threads
+			//lthread_sleep(DPX_PEER_RETRYMS);
 			continue;
 		}
 		if (_dpx_peer_send_greeting(connfd) != DPX_ERROR_NONE) {

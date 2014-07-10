@@ -180,6 +180,8 @@ int netdial(int istcp, char *server, int port) {
 	if(getpeername(fd, (struct sockaddr*)&sa, &sn) >= 0){
 		return fd;
 	}
+
+	perror("netdial");
 	
 	/* report error */
 	sn = sizeof n;

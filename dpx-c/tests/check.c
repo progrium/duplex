@@ -225,8 +225,6 @@ void* test_dpx_receive_id(void* v) {
 	dpx_peer* server = t->server;
 	char addto = t->id;
 
-	printf("ADDTO: %c\n", addto);
-
 	// because this causes issues?? FIXME
 	//pthread_cleanup_push(_test_dpx_receive_cleanup, server);
 
