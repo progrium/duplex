@@ -68,7 +68,6 @@ void dpx_channel_close(dpx_channel *c, DPX_ERROR reason);
 DPX_ERROR dpx_channel_error(dpx_channel *c);
 dpx_frame* dpx_channel_receive_frame(dpx_channel *c);
 DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);
-int dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame);
 
 // properties
 char* dpx_channel_method_get(dpx_channel *c); // returns method

@@ -100,32 +100,6 @@ DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 	return h.err;
 }
 
-struct _dpx_channel_handle_incoming_hs {
-	dpx_channel *c;
-	dpx_frame *frame;
-	int ret;
-};
-
-void* _dpx_channel_handle_incoming_helper(void* v) {
-	struct _dpx_channel_handle_incoming_hs *h = (struct _dpx_channel_handle_incoming_hs*) v;
-	h->ret = _dpx_channel_handle_incoming(h->c, h->frame);
-	return NULL;
-}
-
-int dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
-	_dpx_a a;
-	a.function = &_dpx_channel_handle_incoming_helper;
-
-	struct _dpx_channel_handle_incoming_hs h;
-	h.c = c;
-	h.frame = frame;
-
-	a.args = &h;
-
-	_dpx_joinfunc(c->peer->context, &a);
-	return h.ret;
-}
-
 char* dpx_channel_method_get(dpx_channel *c) {
 	return c->method;
 }
