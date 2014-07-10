@@ -53,35 +53,6 @@ dpx_channel* dpx_peer_open(dpx_peer *p, char *method) {
 	return (dpx_channel*) res;
 }
 
-struct _dpx_peer_handle_open_hs {
-	dpx_peer *p;
-	dpx_duplex_conn *conn;
-	dpx_frame *frame;
-	int ret;
-};
-
-void* _dpx_peer_handle_open_helper(void* v) {
-	struct _dpx_peer_handle_open_hs *h = (struct _dpx_peer_handle_open_hs*) v;
-	h->ret = _dpx_peer_handle_open(h->p, h->conn, h->frame);
-	return NULL;
-}
-
-int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame) {
-	_dpx_a a;
-	a.function = &_dpx_peer_handle_open_helper;
-
-	struct _dpx_peer_handle_open_hs h;
-	h.p = p;
-	h.conn = conn;
-	h.frame = frame;
-
-	a.args = &h;
-
-	_dpx_joinfunc(p->context, &a);
-	
-	return h.ret;
-}
-
 void* _dpx_peer_accept_helper(void* v) {
 	dpx_peer *p = (dpx_peer*) v;
 	dpx_channel* ch = _dpx_peer_accept(p);
@@ -182,12 +153,14 @@ void _dpx_peer_free(dpx_peer *p) {
 
 	dpx_peer_listener *l, *nl;
 	for (l=p->listeners; l != NULL; l=nl) {
+		close(l->fd);
 		nl = l->next;
 		free(l);
 	}
 
 	dpx_peer_connection *c, *nc;
 	for (c=p->conns; c != NULL; c=nc) {
+		_dpx_duplex_conn_free(c->conn);
 		nc = c->next;
 		free(c);
 	}
@@ -374,19 +347,10 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 	chanclose(p->incomingChannels);
 
-	dpx_peer_listener *l, *nl;
-	for (l=p->listeners; l != NULL; l=nl) {
-		close(l->fd);
-		nl = l->next;
-		free(l);
-	}
-
 	dpx_peer_connection *c, *nc;
 	for (c=p->conns; c != NULL; c=nc) {
 		_dpx_duplex_conn_close(c->conn);
-		_dpx_duplex_conn_free(c->conn);
 		nc = c->next;
-		free(c);
 	}
 
 _dpx_peer_close_cleanup:

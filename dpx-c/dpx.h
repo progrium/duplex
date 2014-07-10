@@ -26,6 +26,8 @@ typedef unsigned long DPX_ERROR;
 
 #define DPX_ERROR_PEER_ALREADYCLOSED 30
 
+#define DPX_ERROR_DUPLEX_CLOSED 40
+
 // ------------------------- { forward declarations } -------------------------
 
 struct _dpx_duplex_conn;
@@ -47,8 +49,7 @@ void dpx_peer_free(dpx_peer *p);
 dpx_peer* dpx_peer_new(dpx_context *context);
 
 // functions
-dpx_channel* dpx_peer_open(dpx_peer *p, char *method);
-int dpx_peer_handle_open(dpx_peer *p, dpx_duplex_conn *conn, dpx_frame *frame);
+dpx_channel* dpx_peer_open(dpx_peer *p, char *method); // method is copied
 dpx_channel* dpx_peer_accept(dpx_peer *p);
 DPX_ERROR dpx_peer_close(dpx_peer *p);
 DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port);
@@ -59,9 +60,10 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port);
 // ------------------------------- { channels } -------------------------------
 
 // object tors
-void _dpx_channel_free(dpx_channel* c); // FIXME WHEN DO WE EVEN USE THIS?
+void dpx_channel_free(dpx_channel *c);
 
 // functions
+void dpx_channel_close(dpx_channel *c, DPX_ERROR reason);
 DPX_ERROR dpx_channel_error(dpx_channel *c);
 dpx_frame* dpx_channel_receive_frame(dpx_channel *c);
 DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);

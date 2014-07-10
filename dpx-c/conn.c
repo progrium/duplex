@@ -14,7 +14,6 @@ dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd) {
 }
 
 void _dpx_duplex_conn_close(dpx_duplex_conn *c) {
-	close(c->connfd);
 	chanclose(c->writeCh);
 }
 
@@ -82,7 +81,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 		}
 	}
 
-	// FIXME close(c.writeCh)
+	_dpx_duplex_conn_close(c);
 }
 
 void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
@@ -91,9 +90,6 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 	lthread_detach();
 
 	while(1) {
-		if (c->writeCh == NULL)
-			return;
-
 		dpx_frame* frame;
 		if (chanrecv(c->writeCh, &frame) == LTCHAN_CLOSED)
 			return;
@@ -113,11 +109,14 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 			chansendul(frame->errCh, DPX_ERROR_NONE);
 		}
 	}
+
+	close(c->connfd);
 }
 
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
 	//printf("conn: %p, frame: %p\n", c, frame);
-	chansend(c->writeCh, &frame);
+	if (chansend(c->writeCh, &frame) == LTCHAN_CLOSED)
+		return DPX_ERROR_DUPLEX_CLOSED;
 	return chanrecvul(frame->errCh);
 }
 

@@ -100,27 +100,23 @@ START_TEST(test_dpx_peer_frame_send_receive) {
 	ck_assert_int_eq(*(client_output->payload + 2), *(server_output->payload + 2));
 
 	free(client_input->payload);
-	// FIXME
-	//dpx_frame_free(client_input); // aborts because free(client_input) is bad???
+	dpx_frame_free(client_input);
 	free(server_input->payload);
-	//dpx_frame_free(server_input); // ???
+	dpx_frame_free(server_input);
 
 	free(server_output->payload);
-	//dpx_frame_free(server_output); // ??????
+	dpx_frame_free(server_output);
 	free(client_output->payload);
-	//dpx_frame_free(client_output); // ?????
+	dpx_frame_free(client_output);
 
-	// FIXME
-	//_dpx_channel_free(client_chan); // ????
-	//_dpx_channel_free(server_chan); // ????
+	dpx_channel_free(client_chan);
+	dpx_channel_free(server_chan);
 
 	dpx_peer_close(p1);
 	dpx_peer_close(p2);
 
-	//dpx_peer_free(p1); // ???
-	//dpx_peer_free(p2); // ???
-
-	// FIXME - maybe failing because already being freed due to last? WHAT?
+	dpx_peer_free(p1);
+	dpx_peer_free(p2);
 
 	dpx_cleanup(c);
 } END_TEST

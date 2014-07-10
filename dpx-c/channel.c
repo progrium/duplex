@@ -1,6 +1,43 @@
 #include "dpx-internal.h"
 #include <string.h> // for strcmp
 
+void* _dpx_channel_free_helper(void* v) {
+	_dpx_channel_free((dpx_channel*) v);
+	return NULL;
+}
+
+void dpx_channel_free(dpx_channel *c) {
+	_dpx_a a;
+	a.function = &_dpx_channel_free_helper;
+	a.args = c;
+
+	_dpx_joinfunc(c->peer->context, &a);
+}
+
+struct _dpx_channel_close_hs {
+	dpx_channel *c;
+	DPX_ERROR reason;
+};
+
+void* _dpx_channel_close_helper(void* v) {
+	struct _dpx_channel_close_hs *h = (struct _dpx_channel_close_hs*) v;
+	_dpx_channel_close(h->c, h->reason);
+	return NULL;
+}
+
+void dpx_channel_close(dpx_channel *c, DPX_ERROR reason) {
+	_dpx_a a;
+	a.function = &_dpx_channel_close_helper;
+
+	struct _dpx_channel_close_hs h;
+	h.c = c;
+	h.reason = reason;
+
+	a.args = &h;
+
+	_dpx_joinfunc(c->peer->context, &a);
+}
+
 struct _dpx_channel_error_hs {
 	dpx_channel *c;
 	DPX_ERROR err;
@@ -146,6 +183,9 @@ dpx_channel* _dpx_channel_new() {
 void _dpx_channel_free(dpx_channel* c) {
 	_dpx_channel_close(c, DPX_ERROR_FREEING);
 
+	// give it time to cleanup. [FIXME this might freeze]
+	//lthread_sleep(100);
+
 	chanfree(c->connCh);
 	chanfree(c->incoming);
 	chanfree(c->outgoing);
@@ -159,7 +199,9 @@ dpx_channel* _dpx_channel_new_client(dpx_peer *p, char* method) {
 	dpx_channel* ptr = _dpx_channel_new();
 	ptr->peer = p;
 	ptr->id = p->chanIndex;
-	ptr->method = method;
+
+	ptr->method = malloc(strlen(method) + 1);
+	strcpy(ptr->method, method);
 
 	p->chanIndex += 1;
 
@@ -253,8 +295,6 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 	ltlock(c->lock);
 	DPX_ERROR ret = DPX_ERROR_NONE;
 
-	// FIXME if err != NONE, then the caller might have to free frame
-
 	if (c->err) {
 		ret = c->err;
 		goto _dpx_channel_send_frame_cleanup;
@@ -288,7 +328,7 @@ int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
 	}
 
 	if (!frame->last && strcmp(frame->error, "") != 0) {
-		struct _dpx_channel_close_via_task_struct *s = (struct _dpx_channel_close_via_task_struct*) malloc(sizeof(struct _dpx_channel_close_via_task_struct));
+		struct _dpx_channel_close_via_task_struct *s = malloc(sizeof(struct _dpx_channel_close_via_task_struct));
 		s->c = c;
 		s->err = DPX_ERROR_CHAN_FRAME;
 		lthread_t *lt;
@@ -338,7 +378,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 					
 					continue;
 				}
-				if (strcmp(frame->error, "")) {
+				if (frame->error != NULL && strcmp(frame->error, "")) {
 					_dpx_channel_close(c, DPX_ERROR_CHAN_FRAME);
 				} else if (frame->last && c->server) {
 					_dpx_channel_close(c, DPX_ERROR_NONE);

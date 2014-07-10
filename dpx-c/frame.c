@@ -1,11 +1,17 @@
 #include "dpx-internal.h"
 
 void dpx_frame_free(dpx_frame *frame) {
+	chanclose(frame->errCh);
+	// empty channel
+	DPX_ERROR err;
+	while (chanrecv(frame->errCh, &err) != LTCHAN_CLOSED) {}
+
 	chanfree(frame->errCh);
 	if (frame->method != NULL)
 		free(frame->method);
 	if (frame->error != NULL)
 		free(frame->error);
+
 	dpx_header_map *current, *tmp;
 	HASH_ITER(hh, frame->headers, current, tmp) {
 		HASH_DEL(frame->headers, current);
@@ -26,12 +32,13 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	else
 		frame->channel = DPX_FRAME_NOCH;
 
-	frame->method = "";
+	frame->method = NULL;
 	frame->headers = NULL;
-	frame->error = "";
+
+	frame->error = NULL;
 	frame->last = 0;
 
-	frame->payload = "";
+	frame->payload = NULL;
 	frame->payloadSize = 0;
 
 	return frame;
