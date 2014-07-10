@@ -114,7 +114,6 @@ void* _dpx_libtask_thread(void* v) {
 dpx_context* dpx_init() {
 	struct sockaddr_un local;
 
-	pthread_t task_thread;
 	int task_sock;
 	char* name;
 
@@ -146,12 +145,11 @@ dpx_context* dpx_init() {
 	}
 
 	dpx_context *ret = calloc(1, sizeof(dpx_context));
-	ret->task_thread = task_thread;
 	ret->task_sock = task_sock;
 	ret->name = name;
 
-	pthread_create(&task_thread, NULL, &_dpx_libtask_thread, ret);
-	pthread_detach(task_thread);
+	pthread_create(&ret->task_thread, NULL, &_dpx_libtask_thread, ret);
+	pthread_detach(ret->task_thread);
 
 	return ret;
 }

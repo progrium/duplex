@@ -153,7 +153,7 @@ void test_dpx_call(dpx_peer* peer, char* method, char* payload, int payload_size
 	dpx_frame_free(resp);
 }
 
-void* _test_dpx_receive_cleanup(void* v) {
+void _test_dpx_receive_cleanup(void* v) {
 	dpx_peer* server = v;
 
 	dpx_context *server_context = server->context;
@@ -169,7 +169,6 @@ void* test_dpx_receive(void* v) {
 
 	while (1) {
 		dpx_channel* chan = dpx_peer_accept(server);
-		printf("method: %s\n", dpx_channel_method_get(chan));
 		if (chan != NULL && !strcmp(dpx_channel_method_get(chan), "foo")) {
 			dpx_frame* req = dpx_channel_receive_frame(chan);
 			dpx_frame* resp = dpx_frame_new(chan);
@@ -233,7 +232,6 @@ void* test_dpx_receive_id(void* v) {
 
 	while (1) {
 		dpx_channel* chan = dpx_peer_accept(server);
-		printf("method: %s\n", dpx_channel_method_get(chan));
 		if (chan != NULL && !strcmp(dpx_channel_method_get(chan), "foo")) {
 			dpx_frame* req = dpx_channel_receive_frame(chan);
 			dpx_frame* resp = dpx_frame_new(chan);
