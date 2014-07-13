@@ -367,10 +367,13 @@ START_TEST(test_dpx_async_messaging) {
 		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
 	}
 
-	pthread_cancel(server_thread);
+	dpx_peer_close(server);
+
+	pthread_join(server_thread, NULL);
 
 	dpx_peer_close(client);
 	dpx_cleanup(client_context);
+	dpx_cleanup(server_context);
 
 } END_TEST
 
