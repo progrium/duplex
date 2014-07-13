@@ -390,8 +390,7 @@ void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
 		int connfd = netdial(TCP, addr, port);
 		if (connfd < 0) {
 			printf("(%d) Failed to connect to %s:%d... Attempt %d/%d.\n", p->index, addr, port, i+1, DPX_PEER_RETRYATTEMPTS);
-			// FIXME this locks up threads
-			//lthread_sleep(DPX_PEER_RETRYMS);
+			lthread_sleep(DPX_PEER_RETRYMS);
 			continue;
 		}
 		if (_dpx_peer_send_greeting(connfd) != DPX_ERROR_NONE) {
