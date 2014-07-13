@@ -149,23 +149,15 @@ void test_dpx_call(dpx_peer* peer, char* method, char* payload, int payload_size
 	dpx_frame_free(resp);
 }
 
-void _test_dpx_receive_cleanup(void* v) {
-	dpx_peer* server = v;
-
-	dpx_context *server_context = server->context;
-	dpx_peer_close(server);
-	dpx_cleanup(server_context);
-}
-
 void* test_dpx_receive(void* v) {
 	dpx_peer* server = v;
 
-	// because this causes issues?? FIXME
-	//pthread_cleanup_push(_test_dpx_receive_cleanup, v);
-
 	while (1) {
 		dpx_channel* chan = dpx_peer_accept(server);
-		if (chan != NULL && !strcmp(dpx_channel_method_get(chan), "foo")) {
+		if (chan == NULL)
+			pthread_exit(NULL);
+
+		if (!strcmp(dpx_channel_method_get(chan), "foo")) {
 			dpx_frame* req = dpx_channel_receive_frame(chan);
 			dpx_frame* resp = dpx_frame_new(chan);
 			resp->payload = test_dpx_reverse(req->payload, req->payloadSize);
@@ -187,7 +179,6 @@ START_TEST(test_dpx_rpc_call) {
 	pthread_t server_thread;
 
 	pthread_create(&server_thread, NULL, &test_dpx_receive, server);
-	pthread_detach(server_thread);
 
 	dpx_context *client_context = dpx_init();
 
@@ -204,10 +195,14 @@ START_TEST(test_dpx_rpc_call) {
 		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
 	}
 
-	pthread_cancel(server_thread);
+	dpx_peer_close(server);
+
+	pthread_join(server_thread, NULL);
 
 	dpx_peer_close(client);
 	dpx_cleanup(client_context);
+
+	dpx_cleanup(server_context);
 
 } END_TEST
 
@@ -221,12 +216,12 @@ void* test_dpx_receive_id(void* v) {
 	dpx_peer* server = t->server;
 	char addto = t->id;
 
-	// because this causes issues?? FIXME
-	//pthread_cleanup_push(_test_dpx_receive_cleanup, server);
-
 	while (1) {
 		dpx_channel* chan = dpx_peer_accept(server);
-		if (chan != NULL && !strcmp(dpx_channel_method_get(chan), "foo")) {
+		if (chan == NULL)
+			pthread_exit(NULL);
+
+		if (!strcmp(dpx_channel_method_get(chan), "foo")) {
 			dpx_frame* req = dpx_channel_receive_frame(chan);
 			dpx_frame* resp = dpx_frame_new(chan);
 			resp->payload = test_dpx_reverse(req->payload, req->payloadSize);
@@ -260,7 +255,6 @@ START_TEST(test_dpx_round_robin_async) {
 
 	pthread_t server1thread;
 	pthread_create(&server1thread, NULL, &test_dpx_receive_id, t1);
-	pthread_detach(server1thread);
 
 	dpx_context *server2context = dpx_init();
 	dpx_peer* server2 = dpx_peer_new(server2context);
@@ -272,7 +266,6 @@ START_TEST(test_dpx_round_robin_async) {
 
 	pthread_t server2thread;
 	pthread_create(&server2thread, NULL, &test_dpx_receive_id, t2);
-	pthread_detach(server2thread);
 
 	dpx_context *server3context = dpx_init();
 	dpx_peer* server3 = dpx_peer_new(server3context);
@@ -284,7 +277,6 @@ START_TEST(test_dpx_round_robin_async) {
 
 	pthread_t server3thread;
 	pthread_create(&server3thread, NULL, &test_dpx_receive_id, t3);
-	pthread_detach(server3thread);
 
 	char* payload = "123";
 
@@ -332,12 +324,19 @@ START_TEST(test_dpx_round_robin_async) {
 	if (memchr(servers_checked, '3', 4) == NULL)
 		ck_abort_msg("failed to visit server 3");
 
-	pthread_cancel(server1thread);
-	pthread_cancel(server2thread);
-	pthread_cancel(server3thread);
+	dpx_peer_close(server1);
+	dpx_peer_close(server2);
+	dpx_peer_close(server3);
+
+	pthread_join(server1thread, NULL);
+	pthread_join(server2thread, NULL);
+	pthread_join(server3thread, NULL);
 
 	dpx_peer_close(client);
 	dpx_cleanup(client_context);
+	dpx_cleanup(server1context);
+	dpx_cleanup(server2context);
+	dpx_cleanup(server3context);
 
 } END_TEST
 

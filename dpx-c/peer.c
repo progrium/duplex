@@ -1,5 +1,7 @@
 #include "dpx-internal.h"
+#include <pthread.h>
 
+pthread_mutex_t index_mut = PTHREAD_MUTEX_INITIALIZER;
 int _dpx_peer_index = 0;
 char byte = '\r';
 
@@ -188,11 +190,13 @@ dpx_peer* _dpx_peer_new(dpx_context *context) {
 	peer->closed = 0;
 	peer->rrIndex = 0;
 	peer->chanIndex = 0;
+	pthread_mutex_lock(&index_mut);
 	peer->index = _dpx_peer_index;
+	_dpx_peer_index += 1;
+	pthread_mutex_unlock(&index_mut);
 
 	peer->firstConn = chancreate(sizeof(char), 0);
 
-	_dpx_peer_index += 1;
 
 	lthread_t *lt;
 	lthread_create(&lt, &_dpx_peer_route_open_frames, peer);
@@ -323,12 +327,10 @@ _dpx_peer_handle_open_cleanup:
 dpx_channel* _dpx_peer_accept(dpx_peer *p) {
 	if (p->incomingChannels == NULL)
 		return NULL;
-	// FIXME we can't detect a channel we close... or can we?
+	
 	dpx_channel* chan;
-	if (chanrecv(p->incomingChannels, &chan) == -1) {
-		fprintf(stderr, "failed to accept incoming channel\n");
+	if (chanrecv(p->incomingChannels, &chan) == LTCHAN_CLOSED)
 		return NULL;
-	}
 	return chan;
 }
 

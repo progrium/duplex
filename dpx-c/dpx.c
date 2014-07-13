@@ -1,7 +1,9 @@
 #include "dpx-internal.h"
+#include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 struct _dpx_context {
 	pthread_t task_thread;
@@ -49,6 +51,33 @@ void* _dpx_joinfunc(dpx_context *c, _dpx_a *a) {
 }
 
 // +thread libtask
+void _dpx_libtask_handler(void* v) {
+	DEFINE_LTHREAD;
+	lthread_detach();
+
+	int* store = v;
+	int remotesd = *store;
+	free(store);
+
+	_dpx_a *ptr = NULL;
+
+	int res = lthread_read(remotesd, &ptr, sizeof(void*), 0);
+	if (res != sizeof(void*)) {
+		fprintf(stderr, "failed to handle read\n");
+		abort(); // FIXME ?
+	}
+
+	void* result = ptr->function(ptr->args);
+
+	if (lthread_write(remotesd, &result, sizeof(void*)) != sizeof(void*)) {
+		fprintf(stderr, "failed to write back result\n");
+		abort(); // FIXME ?
+	}
+
+	shutdown(remotesd, SHUT_WR); // on client side, have to close().
+}
+
+// +thread libtask
 void _dpx_libtask_checker(void* v) {
 	dpx_context *c = v;
 
@@ -64,6 +93,7 @@ void _dpx_libtask_checker(void* v) {
 	int again = 0;
 
 	while(1) {
+		lthread_t *lt;
 		int remotesd;
 
 		if ((remotesd = sockaccept(c->task_sock)) == -1) {
@@ -79,22 +109,10 @@ void _dpx_libtask_checker(void* v) {
 
 		again = 0;
 
-		_dpx_a *ptr = NULL;
+		int* store = malloc(sizeof(int));
+		*store = remotesd;
 
-		int res = lthread_read(remotesd, &ptr, sizeof(void*), 0);
-		if (res != sizeof(void*)) {
-			fprintf(stderr, "failed to handle read\n");
-			abort(); // FIXME ?
-		}
-
-		void* result = ptr->function(ptr->args);
-
-		if (lthread_write(remotesd, &result, sizeof(void*)) != sizeof(void*)) {
-			fprintf(stderr, "failed to write back result\n");
-			abort(); // FIXME ?
-		}
-
-		shutdown(remotesd, SHUT_WR); // on client side, have to close().
+		lthread_create(&lt, &_dpx_libtask_handler, store);
 	}
 }
 
@@ -144,6 +162,11 @@ dpx_context* dpx_init() {
 		abort();
 	}
 
+	int flags = fcntl(task_sock, F_GETFL, 0);
+	fcntl(task_sock, F_SETFL, flags | O_NONBLOCK);
+
+	printf("dpx_init: sock @ %s\n", name);
+
 	dpx_context *ret = calloc(1, sizeof(dpx_context));
 	ret->task_sock = task_sock;
 	ret->name = name;
@@ -155,6 +178,7 @@ dpx_context* dpx_init() {
 }
 
 void dpx_cleanup(dpx_context *c) {
+	printf("dpx_cleanup: sock @ %s\n", c->name);
 	unlink(c->name);
 	pthread_cancel(c->task_thread);
 	close(c->task_sock);

@@ -283,7 +283,7 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 	frame->channel = c->id;
 	frame->type = DPX_FRAME_DATA;
 
-	printf("sending DATA frame channel: %d\n", c->id);
+	printf("(%d) Sending DATA frame for channel %d\n", c->peer->index, c->id);
 
 	chansend(c->outgoing, &frame);
 
