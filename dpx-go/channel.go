@@ -25,7 +25,7 @@ func (c *Channel) Method() string {
 }
 
 func (c *Channel) Error() error {
-	return ParseError(uint64(C.dpx_channel_error(c.ch)))
+	return ParseError(int64(C.dpx_channel_error(c.ch)))
 }
 
 func (c *Channel) ReceiveFrame() *Frame {
@@ -37,5 +37,5 @@ func (c *Channel) ReceiveFrame() *Frame {
 }
 
 func (c *Channel) SendFrame(frame *Frame) error {
-	return ParseError(uint64(C.dpx_channel_send_frame(c.ch, toCFrame(frame))))
+	return ParseError(int64(C.dpx_channel_send_frame(c.ch, toCFrame(frame))))
 }

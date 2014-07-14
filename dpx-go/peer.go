@@ -9,6 +9,7 @@ import (
 	"net"
 	"runtime"
 	"strconv"
+	"unsafe"
 )
 
 type Peer struct {
@@ -24,8 +25,8 @@ func newPeer() *Peer {
 	}
 
 	runtime.SetFinalizer(p, func(p *Peer) {
-		C.dpx_peer_close(p)
-		C.dpx_peer_free(p)
+		C.dpx_peer_close(p.peer)
+		C.dpx_peer_free(p.peer)
 		C.dpx_cleanup(context)
 	})
 
@@ -34,7 +35,7 @@ func newPeer() *Peer {
 
 func (p *Peer) Open(method string) *Channel {
 	cMethod := C.CString(method)
-	defer C.free(cMethod)
+	defer C.free(unsafe.Pointer(cMethod))
 	cChan := C.dpx_peer_open(p.peer, cMethod)
 	return fromCChannel(cChan)
 }
@@ -45,7 +46,7 @@ func (p *Peer) Accept() *Channel {
 }
 
 func (p *Peer) Close() error {
-	return ParseError(uint64(C.dpx_peer_close(p.peer)))
+	return ParseError(int64(C.dpx_peer_close(p.peer)))
 }
 
 func (p *Peer) Connect(addr string) error {
@@ -60,9 +61,9 @@ func (p *Peer) Connect(addr string) error {
 	}
 
 	chost := C.CString(host)
-	defer C.free(host)
+	defer C.free(unsafe.Pointer(chost))
 
-	return ParseError(C.dpx_peer_connect(p.peer, chost, C.int(iport)))
+	return ParseError(int64(C.dpx_peer_connect(p.peer, chost, C.int(iport))))
 }
 
 func (p *Peer) Bind(addr string) error {
@@ -77,7 +78,7 @@ func (p *Peer) Bind(addr string) error {
 	}
 
 	chost := C.CString(host)
-	defer C.free(host)
+	defer C.free(unsafe.Pointer(chost))
 
-	return ParseError(C.dpx_peer_bind(p.peer, chost, C.int(iport)))
+	return ParseError(int64(C.dpx_peer_bind(p.peer, chost, C.int(iport))))
 }

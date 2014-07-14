@@ -17,7 +17,7 @@ func Reverse(in []byte) []byte {
 
 func Call(peer *Peer, method string, arg interface{}) interface{} {
 	ch := Open(peer, method)
-	req := NewFrame(ch)
+	req := NewFrame()
 	req.Payload = arg.([]byte)
 	req.Last = true
 	SendFrame(ch, req)
@@ -42,11 +42,11 @@ func TestPeerFrameSendReceive(t *testing.T) {
 	clientChannel := Open(s1, "foobar")
 	_, serverChannel := Accept(s2)
 
-	if serverChannel.Method != clientChannel.Method {
-		t.Fatal("channel method not matching", serverChannel.Method, clientChannel.Method)
+	if serverChannel.Method() != clientChannel.Method() {
+		t.Fatal("channel method not matching", serverChannel.Method(), clientChannel.Method())
 	}
 
-	clientInput := NewFrame(clientChannel)
+	clientInput := NewFrame()
 	clientInput.Payload = []byte{1, 2, 3}
 	clientInput.Last = true
 	SendFrame(clientChannel, clientInput)
@@ -56,7 +56,7 @@ func TestPeerFrameSendReceive(t *testing.T) {
 		t.Fatal("input payloads not matching", serverInput.Payload, clientInput.Payload)
 	}
 
-	serverOutput := NewFrame(serverChannel)
+	serverOutput := NewFrame()
 	serverOutput.Payload = []byte{3, 2, 1}
 	serverOutput.Last = true
 	SendFrame(serverChannel, serverOutput)
@@ -86,7 +86,7 @@ func TestRPCishCallAccept(t *testing.T) {
 			method, ch := Accept(server)
 			if ch != nil && method == "foo" {
 				req := ReceiveFrame(ch)
-				resp := NewFrame(ch)
+				resp := NewFrame()
 				resp.Payload = Reverse(req.Payload)
 				SendFrame(ch, resp)
 			}
@@ -133,7 +133,7 @@ func TestRoundRobinAndAsyncConnect(t *testing.T) {
 			if ch != nil && method == "foo" {
 				serverResponses <- id
 				req := ReceiveFrame(ch)
-				resp := NewFrame(ch)
+				resp := NewFrame()
 				resp.Payload = Reverse(req.Payload)
 				SendFrame(ch, resp)
 			}
@@ -200,7 +200,7 @@ func TestAsyncMessaging(t *testing.T) {
 			method, ch := Accept(server)
 			if ch != nil && method == "foo" {
 				req := ReceiveFrame(ch)
-				resp := NewFrame(ch)
+				resp := NewFrame()
 				resp.Payload = Reverse(req.Payload)
 				SendFrame(ch, resp)
 			}

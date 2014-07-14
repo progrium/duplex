@@ -47,8 +47,8 @@ func Codec(peer *Peer, name string, codec interface{}) error {
 
 // Channel operations
 
-func NewFrame(channel *Channel) *Frame {
-	return newFrame(channel)
+func NewFrame() *Frame {
+	return &Frame{}
 }
 
 func SendFrame(channel *Channel, frame *Frame) error {
@@ -61,13 +61,13 @@ func ReceiveFrame(channel *Channel) *Frame {
 }
 
 func Send(channel *Channel, data interface{}) error {
-	frame := newFrame(channel)
+	frame := NewFrame()
 	Encode(channel, frame, data)
 	return SendFrame(channel, frame)
 }
 
 func SendLast(channel *Channel, data interface{}) error {
-	frame := newFrame(channel)
+	frame := NewFrame()
 	if data != nil {
 		Encode(channel, frame, data)
 	}
@@ -76,7 +76,7 @@ func SendLast(channel *Channel, data interface{}) error {
 }
 
 func SendErr(channel *Channel, err string, last bool) error {
-	frame := newFrame(channel)
+	frame := NewFrame()
 	frame.Error = err
 	frame.Last = last
 	return SendFrame(channel, frame)
@@ -125,7 +125,7 @@ func Open(peer *Peer, method string) *Channel {
 func Accept(peer *Peer) (string, *Channel) {
 	ch := peer.Accept()
 	if ch != nil {
-		return ch.Method, ch
+		return ch.Method(), ch
 	}
 	return "", nil
 }

@@ -17,7 +17,7 @@ const (
 	DpxErrDuplexClosed = 40
 )
 
-func ParseError(err uint64) error {
+func ParseError(err int64) error {
 	if err == DpxErrNone {
 		return nil
 	}
@@ -26,11 +26,11 @@ func ParseError(err uint64) error {
 }
 
 type DpxError struct {
-	err uint64
+	err int64
 }
 
-func (d *DpxError) Code() uint64 {
-	return err
+func (d *DpxError) Code() int64 {
+	return d.err
 }
 
 func (d *DpxError) Error() string {
@@ -57,4 +57,5 @@ func (d *DpxError) Error() string {
 	case DpxErrDuplexClosed:
 		return "dpx: duplex connection closed"
 	}
+	return "dpx: something went horribly wrong"
 }
