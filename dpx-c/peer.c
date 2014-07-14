@@ -283,6 +283,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 			err = _dpx_duplex_conn_write_frame(conn, frame);
 			if (err == DPX_ERROR_NONE)
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
+			dpx_frame_free(frame);
 		}
 	}
 }
@@ -298,7 +299,8 @@ dpx_channel* _dpx_peer_open(dpx_peer *p, char *method) {
 	dpx_frame* frame = dpx_frame_new(ret);
 
 	frame->type = DPX_FRAME_OPEN;
-	frame->method = method;
+	frame->method = malloc(strlen(method + 1));
+	strcpy(frame->method, method);
 
 	chansend(p->openFrames, &frame);
 
