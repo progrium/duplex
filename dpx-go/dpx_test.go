@@ -68,7 +68,6 @@ func TestPeerFrameSendReceive(t *testing.T) {
 
 	Close(s1)
 	Close(s2)
-
 }
 
 func TestRPCishCallAccept(t *testing.T) {
@@ -84,6 +83,9 @@ func TestRPCishCallAccept(t *testing.T) {
 	go func() {
 		for {
 			method, ch := Accept(server)
+			if ch == nil {
+				return
+			}
 			if ch != nil && method == "foo" {
 				req := ReceiveFrame(ch)
 				resp := NewFrame()
@@ -104,7 +106,7 @@ func TestRPCishCallAccept(t *testing.T) {
 
 func TestRoundRobinAndAsyncConnect(t *testing.T) {
 	client := NewPeer()
-	if err := Connect(client, "127.0.0.1:9876"); err != nil {
+	if err := Connect(client, "127.0.0.1:9878"); err != nil {
 		t.Fatal(err)
 	}
 	if err := Connect(client, "127.0.0.1:9875"); err != nil {
@@ -114,7 +116,7 @@ func TestRoundRobinAndAsyncConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	server1 := NewPeer()
-	if err := Bind(server1, "127.0.0.1:9876"); err != nil {
+	if err := Bind(server1, "127.0.0.1:9878"); err != nil {
 		t.Fatal(err)
 	}
 	server2 := NewPeer()
@@ -130,6 +132,9 @@ func TestRoundRobinAndAsyncConnect(t *testing.T) {
 	serve := func(s *Peer, id string) {
 		for {
 			method, ch := Accept(s)
+			if ch == nil {
+				return
+			}
 			if ch != nil && method == "foo" {
 				serverResponses <- id
 				req := ReceiveFrame(ch)
@@ -198,6 +203,9 @@ func TestAsyncMessaging(t *testing.T) {
 	go func() {
 		for {
 			method, ch := Accept(server)
+			if ch == nil {
+				return
+			}
 			if ch != nil && method == "foo" {
 				req := ReceiveFrame(ch)
 				resp := NewFrame()
@@ -217,11 +225,11 @@ func TestAsyncMessaging(t *testing.T) {
 
 func TestPeerSendReceiveCodec(t *testing.T) {
 	s1 := NewPeer()
-	if err := Bind(s1, "127.0.0.1:9876"); err != nil {
+	if err := Bind(s1, "127.0.0.1:9872"); err != nil {
 		t.Fatal(err)
 	}
 	s2 := NewPeer()
-	if err := Connect(s2, "127.0.0.1:9876"); err != nil {
+	if err := Connect(s2, "127.0.0.1:9872"); err != nil {
 		t.Fatal(err)
 	}
 

@@ -13,6 +13,10 @@ type Channel struct {
 }
 
 func fromCChannel(ch *C.dpx_channel) *Channel {
+	if ch == nil {
+		return nil
+	}
+
 	channel := &Channel{ch: ch}
 	runtime.SetFinalizer(channel, func(x *Channel) {
 		C.dpx_channel_free(x.ch)
