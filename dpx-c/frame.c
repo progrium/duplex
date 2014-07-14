@@ -44,6 +44,68 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	return frame;
 }
 
+char* dpx_frame_header_add(dpx_frame *frame, char* key, char* value) {
+	dpx_header_map *m = malloc(sizeof(dpx_header_map));
+	m->key = malloc(strlen(key) + 1);
+	strcpy(m->key, key);
+	m->value = malloc(strlen(value) + 1);
+	strcpy(m->value, value);
+
+	// remove old header if any
+	dpx_header_map *old;
+	HASH_FIND_STR(frame->headers, key, old);
+	if (old != NULL)
+		HASH_DEL(frame->headers, old);
+
+	HASH_ADD_KEYPTR(hh, frame->headers, m->key, strlen(m->key), m);
+
+	if (old == NULL)
+		return NULL;
+
+	char* oldval = old->value;
+
+	free(old->key);
+	free(old);
+
+	return oldval;
+}
+
+char* dpx_frame_header_find(dpx_frame *frame, char* key) {
+	dpx_header_map *found;
+	HASH_FIND_STR(frame->headers, key, found);
+
+	if (found == NULL)
+		return NULL;
+	return found->value;
+}
+
+void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(char* k, char* v)) {
+	dpx_header_map *cur, *next;
+
+	HASH_ITER(hh, frame->headers, cur, next) {
+		iter_func(cur->key, cur->value);
+	}
+}
+
+unsigned int dpx_frame_header_len(dpx_frame *frame) {
+	return HASH_COUNT(frame->headers);
+}
+
+char* dpx_frame_header_rm(dpx_frame *frame, char* key) {
+	dpx_header_map *found;
+	HASH_FIND_STR(frame->headers, key, found);
+
+	if (found == NULL)
+		return NULL;
+
+	HASH_DEL(frame->headers, found);
+	char* val = found->value;
+
+	free(found->key);
+	free(found);
+	return val;
+}
+
 // ----------------------------------------------------------------------------
 
 dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {

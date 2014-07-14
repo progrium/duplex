@@ -1,5 +1,4 @@
 #include <ltchan.h>
-#include "uthash.h"
 
 // ---------------------------- { threadsafe api } ----------------------------
 // ----------- [and frankly, the only one you should be touching...] ----------
@@ -80,12 +79,7 @@ char* dpx_channel_method_set(dpx_channel *c, char* method); // returns old one
 
 #define DPX_PACK_ARRAY_SIZE 7
 
-struct _dpx_header_map {
-	char* key;
-	char* value;
-	UT_hash_handle hh; // hasher
-};
-
+struct _dpx_header_map;
 typedef struct _dpx_header_map dpx_header_map;
 
 struct _dpx_frame {
@@ -98,7 +92,7 @@ struct _dpx_frame {
 	int channel;
 
 	char* method;
-	dpx_header_map *headers; // use uthash.h to modify
+	dpx_header_map *headers;
 	char* error;
 	int last;
 
@@ -110,14 +104,9 @@ struct _dpx_frame {
 void dpx_frame_free(dpx_frame *frame);
 dpx_frame* dpx_frame_new(dpx_channel *ch);
 
-// -------------------------- { duplex connection } ---------------------------
-
-// void _dpx_duplex_conn_free(dpx_duplex_conn *c); // BEWARE, FREE DOES NOT CALL CLOSE!
-// void _dpx_duplex_conn_close(dpx_duplex_conn *c);
-// dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd);
-
-// void _dpx_duplex_conn_read_frames(dpx_duplex_conn *c);
-// void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c);
-// DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame);
-// void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch);
-// void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch);
+// functions (char* are always copied)
+char* dpx_frame_header_add(dpx_frame *frame, char* key, char* value);
+char* dpx_frame_header_find(dpx_frame *frame, char* key);
+void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(char* k, char* v));
+unsigned int dpx_frame_header_len(dpx_frame *frame);
+char* dpx_frame_header_rm(dpx_frame *frame, char* key);

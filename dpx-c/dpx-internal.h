@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "dpx.h"
+#include "uthash.h"
 
 //#define NDEBUG
 #include <assert.h>
@@ -134,8 +135,15 @@ char* _dpx_channel_method_set(dpx_channel *c, char* method);
 
 // -------------------------------- { frames } --------------------------------
 // #defines -> dpx.h
-// struct _dpx_header_map -> dpx.h
-// typedef dpx_header_map -> dpx.h
+
+struct _dpx_header_map {
+	char* key;
+	char* value;
+	UT_hash_handle hh; // hasher
+};
+
+typedef struct _dpx_header_map dpx_header_map;
+
 // struct _dpx_frame -> dpx.h
 
 // dpx_frame_free -> dpx.h
