@@ -107,6 +107,6 @@ dpx_frame* dpx_frame_new(dpx_channel *ch);
 // functions (char* are always copied)
 char* dpx_frame_header_add(dpx_frame *frame, char* key, char* value);
 char* dpx_frame_header_find(dpx_frame *frame, char* key);
-void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(char* k, char* v));
+void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(void* arg, char* k, char* v), void* arg);
 unsigned int dpx_frame_header_len(dpx_frame *frame);
 char* dpx_frame_header_rm(dpx_frame *frame, char* key);

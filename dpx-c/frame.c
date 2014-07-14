@@ -79,11 +79,11 @@ char* dpx_frame_header_find(dpx_frame *frame, char* key) {
 	return found->value;
 }
 
-void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(char* k, char* v)) {
+void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(void* arg, char* k, char* v), void* arg) {
 	dpx_header_map *cur, *next;
 
 	HASH_ITER(hh, frame->headers, cur, next) {
-		iter_func(cur->key, cur->value);
+		iter_func(arg, cur->key, cur->value);
 	}
 }
 
