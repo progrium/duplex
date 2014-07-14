@@ -24,11 +24,13 @@ In short, the messaging abstractions work against the goals of Duplex. However t
 
 ## Implementations
 
-### Reference Implementation (dpx-ref)
+The low level library is called `libdpx`. The high level library (niceties around your language, except if you're using C) is called `duplex`.
 
-Prototyped in Go. It is currently usable. Simply `go get -u github.com/robxu9/duplex/dpx-ref`.
+### Reference Implementation (prototype)
 
-### C Implementation (dpx-c)
+Prototyped in Go. It is currently usable. Simply `go get -u github.com/robxu9/duplex/prototype`.
+
+### Core C Implementation (libdpx)
 
 Alpha status, not tested in production. Use at your own risk, report lots of bugs for fixing.
 
@@ -47,17 +49,15 @@ The basic workflow for using `dpx-c` is the following:
 
 Compile with `make`, test with `make check`, install with `make install`.
 
-### Go Implemntation via cgo (dpx-go)
+### Bindings around libdpx (bindings)
+
+#### go-duplex (high level api for golang)
 
 Not usable yet.
 
-## Roadmap
+#### go-dpx (low level api for golang)
 
- * Prototype in Go
- * Validate by using in Flynn components
- * Document protocols
- * Port to C (using the Go-like libtask)
- * Write bindings and popularize!
+Interacts directly with `dpx-c`. You must have `dpx-c` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/golang/dpx`.
 
 ## How it works
 
