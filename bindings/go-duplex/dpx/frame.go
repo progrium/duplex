@@ -23,11 +23,17 @@ type Frame struct {
 
 func fromCFrame(frame *C.dpx_frame) *Frame {
 	f := &Frame{
-		Method:  C.GoString(frame.method),
 		Headers: make(map[string]string),
-		Error:   C.GoString(frame.error),
 		Last:    (frame.last != 0),
 		Payload: C.GoBytes(unsafe.Pointer(frame.payload), frame.payloadSize),
+	}
+
+	if frame.method != nil {
+		f.Method = C.GoString(frame.method)
+	}
+
+	if frame.error != nil {
+		f.Error = C.GoString(frame.error)
 	}
 
 	// iterating through headers:
@@ -57,7 +63,9 @@ func toCFrame(frame *Frame) *C.dpx_frame {
 		C.dpx_frame_header_add(cframe, C.CString(k), C.CString(v))
 	}
 
-	C.convert_payload(cframe, unsafe.Pointer(&frame.Payload[0]), C.int(len(frame.Payload)))
+	if len(frame.Payload) != 0 {
+		C.convert_payload(cframe, unsafe.Pointer(&frame.Payload[0]), C.int(len(frame.Payload)))
+	}
 
 	return cframe
 }

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sync"
 
-	"./dpx"
+	"github.com/robxu9/duplex/bindings/go-duplex/dpx"
 )
 
 type Peer struct {

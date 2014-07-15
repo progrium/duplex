@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -54,12 +56,14 @@ func (t *Arith) Error(args *Args, reply *Reply) error {
 }
 
 func makePair(t *testing.T) (*Peer, *Peer) {
+	port := strconv.Itoa(rand.Intn(30) + 9860)
+
 	client := NewPeer()
-	if err := client.Bind("127.0.0.1:9876"); err != nil {
+	if err := client.Bind("127.0.0.1:" + port); err != nil {
 		t.Fatal(err)
 	}
 	server := NewPeer()
-	if err := server.Connect("127.0.0.1:9876"); err != nil {
+	if err := server.Connect("127.0.0.1:" + port); err != nil {
 		t.Fatal(err)
 	}
 	return client, server
