@@ -345,12 +345,12 @@ START_TEST(test_dpx_async_messaging) {
 	dpx_context *client_context = dpx_init();
 
 	dpx_peer* client = dpx_peer_new(client_context);
-	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to connect.");
+	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9873) == DPX_ERROR_NONE, "Error encountered trying to connect.");
 
 	dpx_context *server_context = dpx_init();
 
 	dpx_peer* server = dpx_peer_new(server_context);
-	ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to bind.");
+	ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9873) == DPX_ERROR_NONE, "Error encountered trying to bind.");
 
 	pthread_t server_thread;
 
