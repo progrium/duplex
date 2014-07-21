@@ -1,6 +1,6 @@
 package dpx
 
-// #cgo LDFLAGS: -ldpx
+// #cgo LDFLAGS: -ldpx -lltchan -llthread -lmsgpack
 // #include "frame.h"
 import "C"
 import (
