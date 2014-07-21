@@ -7,7 +7,7 @@ STATIC=$(NAME).a
 DESTDIR=
 PREFIX=/usr/local
 
-all: $(SHARED) $(STATIC)
+all: $(STATIC)
 
 OFILES=\
 	channel.o\
@@ -18,13 +18,10 @@ OFILES=\
 	dpx.o
 
 CC=gcc
-CFLAGS=-Wall -Werror=implicit-function-declaration -I. -ggdb -llthread -lltchan -lmsgpack -pthread
+CFLAGS=-Wall -Werror=implicit-function-declaration -I. -ggdb -lltchan -llthread -lmsgpack -pthread
 
 %.o: %.c
-	$(CC) $(CFLAGS) -fPIC -c $*.c
-
-$(SHARED): $(OFILES)
-	$(CC) $(CFLAGS) -shared -o $(SHARED) $(OFILES)
+	$(CC) $(CFLAGS) -c $*.c
 
 $(STATIC): $(OFILES)
 	ar rcs $(STATIC) $(OFILES)
@@ -36,8 +33,7 @@ clean:
 check: all
 	$(MAKE) -C tests check
 
-install: $(SHARED) $(STATIC)
-	cp $(SHARED) $(DESTDIR)$(PREFIX)/lib
+install: $(STATIC)
 	cp $(STATIC) $(DESTDIR)$(PREFIX)/lib
 	cp dpx.h $(DESTDIR)$(PREFIX)/include
 
