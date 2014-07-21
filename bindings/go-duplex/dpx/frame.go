@@ -3,9 +3,7 @@ package dpx
 // #cgo LDFLAGS: -ldpx -lltchan -llthread -lmsgpack
 // #include "frame.h"
 import "C"
-import (
-	"unsafe"
-)
+import "unsafe"
 
 const (
 	OpenFrame = 0

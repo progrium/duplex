@@ -35,6 +35,10 @@ func (c *Channel) Error() error {
 func (c *Channel) ReceiveFrame() *Frame {
 	frame := C.dpx_channel_receive_frame(c.ch)
 
+	if frame == nil {
+		return nil
+	}
+
 	ourframe := fromCFrame(frame)
 	C.dpx_frame_free(frame)
 	return ourframe
