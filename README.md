@@ -1,4 +1,4 @@
-# Duplex ![Coverity Scan Build Status](https://scan.coverity.com/projects/2512/badge.svg)
+# Duplex [![Coverity Scan Build Status](https://scan.coverity.com/projects/2512/badge.svg)](https://scan.coverity.com/projects/2512)
 
 Duplex is a simple, efficient, extensible application communications protocol and library. It's heavily inspired by ZeroMQ and BERT-RPC, but draws influence from Twitter Finagle, HTTP/2, zerorpc, and Unix pipes.
 
@@ -32,13 +32,13 @@ Prototyped in Go. It is currently usable. Simply `go get -u github.com/robxu9/du
 
 ### Core C Implementation (libdpx)
 
-Alpha status, not tested in production. Use at your own risk, report lots of bugs for fixing.
+Seems to work (tm).
 
 The basic workflow for using `dpx-c` is the following:
 
 * Initialise a worker context, so that all operations happen on the worker thread: `dpx_context *c = dpx_init();`
 * Initialise a peer that will utilise that context: `dpx_peer *p = dpx_peer_new(c);`
-* Report lots of bugs.
+* Use happily and/or report lots of bugs.
 
 #### Requirements:
 
@@ -48,16 +48,21 @@ The basic workflow for using `dpx-c` is the following:
 * For testing: [check](http://check.sourceforge.net)
 
 Compile with `make`, test with `make check`, install with `make install`.
+(Don't forget to run `ldconfig`; I make that mistake way too often.)
+
+#### Troubles:
+
+* lthread has trouble being a shared library (which prevents duplex from being a shared library): see [robxu9/duplex#2](https://github.com/robxu9/duplex/issues/2).
 
 ### Bindings around libdpx (bindings)
 
 #### go-duplex (high level api for golang)
 
-Not usable yet.
+Uses `go-dpx` to JSON encode objects for sending over to other applications. You must have `dpx-c` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex`.
 
 #### go-dpx (low level api for golang)
 
-Interacts directly with `dpx-c`. You must have `dpx-c` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/golang/dpx`.
+Interacts directly with `dpx-c`. You must have `dpx-c` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex/dpx`.
 
 ## How it works
 
@@ -106,6 +111,10 @@ Because Duplex peers are symmetrical, there is no technical distinction of clien
 Like ZeroMQ devices, Duplex provides tools to let you build middleman "proxy" services. Using the metadata of headers, similar to HTTP proxies, you can customize routing and add features like authentication or rate limiting, without touching the RPC payloads. This is somewhat similar to Filters in Twitter Finagle.
 
 One "trick" we've been thinking about in tandem with our service discovery system, is allowing a middleman service to insert itself into the path of RPC connections via service discovery hooks. This would allow you to transparently insert and remove RPC proxy services to log traffic, add tracing, split requests, etc. 
+
+## Thanks to
+
+[Jeff Lindsay](https://github.com/progrium), my awesome mentor at DigitalOcean.
 
 ## License
 
