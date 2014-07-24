@@ -1,12 +1,10 @@
 package dpx
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
-
-	"github.com/ugorji/go/codec"
 )
 
 // This file contains the public API functions. They would
@@ -14,7 +12,6 @@ import (
 
 var CloseStreamErr = "CloseStream"
 
-var mh codec.MsgpackHandle
 var debugMode = true
 
 func debug(v ...interface{}) {
@@ -97,19 +94,15 @@ func Decode(ch *Channel, frame *Frame, obj interface{}) error {
 	if frame.Error != "" {
 		return errors.New(frame.Error)
 	}
-	buffer := bytes.NewBuffer(frame.Payload)
-	decoder := codec.NewDecoder(buffer, &mh)
-	return decoder.Decode(obj)
+	return json.Unmarshal(frame.Payload, obj)
 }
 
 func Encode(ch *Channel, frame *Frame, obj interface{}) error {
-	buffer := new(bytes.Buffer)
-	encoder := codec.NewEncoder(buffer, &mh)
-	err := encoder.Encode(obj)
+	bte, err := json.Marshal(obj)
 	if err != nil {
 		return err
 	}
-	frame.Payload = buffer.Bytes()
+	frame.Payload = bte
 	return nil
 }
 
