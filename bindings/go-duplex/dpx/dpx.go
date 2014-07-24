@@ -1,6 +1,7 @@
 package dpx
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -94,7 +95,10 @@ func Decode(ch *Channel, frame *Frame, obj interface{}) error {
 	if frame.Error != "" {
 		return errors.New(frame.Error)
 	}
-	return json.Unmarshal(frame.Payload, obj)
+	buffer := bytes.NewBuffer(frame.Payload)
+	decoder := json.NewDecoder(buffer)
+
+	return decoder.Decode(obj)
 }
 
 func Encode(ch *Channel, frame *Frame, obj interface{}) error {
