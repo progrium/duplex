@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <time.h>
 #include <unistd.h>
 
 struct _dpx_context {
@@ -29,8 +30,14 @@ void* _dpx_joinfunc(dpx_context *c, _dpx_a *a) {
 
 	len = strlen(sa.sun_path) + sizeof(sa.sun_family);
 	while(connect(fd, (struct sockaddr*)&sa, len) == -1){
-		fprintf(stderr, "failed to connect, waiting 1 second to try again\n");
-		sleep(1);
+        // this is annoying
+        //fprintf(stderr, "failed to connect, waiting 1 second to try again\n");
+		
+        // wait like... 0.05 seconds? that is 50000000 nanoseconds.
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 50000000;
+        nanosleep(&t, NULL);
 	}
 
 	if (write(fd, &a, sizeof(void*)) != sizeof(void*)) {

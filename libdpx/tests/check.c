@@ -285,6 +285,8 @@ START_TEST(test_dpx_round_robin_async) {
 
 	char servers_checked[4];
 
+    sleep(1);
+
 	// first server
 	test_dpx_call(client, "foo", payload, 3, &receive, &receive_size);
 	if (strncmp(receive, "321", 3)) {
