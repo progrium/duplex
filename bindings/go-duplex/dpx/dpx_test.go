@@ -2,6 +2,7 @@ package dpx
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
@@ -23,10 +24,6 @@ func Call(peer *Peer, method string, arg interface{}) interface{} {
 	SendFrame(ch, req)
 	resp := ReceiveFrame(ch)
 	return resp.Payload
-}
-
-type ExamplePayload struct {
-	Message string
 }
 
 func TestPeerFrameSendReceive(t *testing.T) {
@@ -223,6 +220,10 @@ func TestAsyncMessaging(t *testing.T) {
 	Close(client)
 }
 
+type ExamplePayload struct {
+	Message string
+}
+
 func TestPeerSendReceiveCodec(t *testing.T) {
 	s1 := NewPeer()
 	if err := Bind(s1, "127.0.0.1:9872"); err != nil {
@@ -252,4 +253,68 @@ func TestPeerSendReceiveCodec(t *testing.T) {
 	Close(s1)
 	Close(s2)
 
+}
+
+type StreamingArgs struct {
+	A       int
+	Count   int
+	ErrorAt int
+}
+
+type StreamingReply struct {
+	C     int
+	Index int
+}
+
+func TestPeerSendReceiveCodecAdvanced(t *testing.T) {
+	s1 := NewPeer()
+	if err := Bind(s1, "127.0.0.1:9871"); err != nil {
+		t.Fatal(err)
+	}
+	s2 := NewPeer()
+	if err := Connect(s2, "127.0.0.1:9871"); err != nil {
+		t.Fatal(err)
+	}
+
+	defer s1.Close()
+	defer s2.Close()
+
+	client := s2.Open("Sum")
+	server := s1.Accept()
+
+	go func() {
+		args := new(StreamingArgs)
+		sum := 0
+		for {
+			err := Receive(server, args)
+			if err == io.EOF {
+				break
+			} else if err != nil {
+				SendErr(server, err.Error(), true)
+				return
+			}
+			sum += args.A
+		}
+		SendLast(server, &StreamingReply{C: sum})
+	}()
+
+	Send(client, &StreamingArgs{9, 0, 0})
+	Send(client, &StreamingArgs{3, 0, 0})
+	Send(client, &StreamingArgs{3, 0, 0})
+	Send(client, &StreamingArgs{6, 0, 0})
+	SendLast(client, &StreamingArgs{9, 0, 0})
+
+	reply := new(StreamingReply)
+	err := Receive(client, reply)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := client.Error(); err != nil {
+		t.Fatal("failed to do tests:", err)
+	}
+
+	if reply.C != 30 {
+		t.Fatal("Didn't receive the right sum value back:", reply.C)
+	}
 }
