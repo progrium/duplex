@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Reverse(in []byte) []byte {
@@ -144,6 +145,8 @@ func TestRoundRobinAndAsyncConnect(t *testing.T) {
 	go serve(server1, "1")
 	go serve(server2, "2")
 	go serve(server3, "3")
+
+	time.Sleep(1 * time.Second)
 
 	resp1 := Call(client, "foo", []byte{1, 2, 3}).([]byte)
 	if !bytes.Equal(resp1, []byte{3, 2, 1}) {
