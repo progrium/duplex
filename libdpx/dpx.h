@@ -1,4 +1,9 @@
-#include <ltchan.h>
+#ifndef _DPX_H_
+#define _DPX_H_ 1
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // ---------------------------- { threadsafe api } ----------------------------
 // ----------- [and frankly, the only one you should be touching...] ----------
@@ -7,9 +12,9 @@ struct _dpx_context;
 typedef struct _dpx_context dpx_context;
 
 // BEFORE YOU DO ANYTHING WITH THIS API, YOU MUST INITIALISE THE COR-SCHEDULER.
-dpx_context* dpx_init();
+void dpx_init();
 // OTHERWISE PREPARE FOR TROUBLE
-void dpx_cleanup(dpx_context* c);
+void dpx_cleanup();
 
 // -------------------------------- { errors } --------------------------------
 #define DPX_ERROR_NONE 0
@@ -46,7 +51,7 @@ typedef struct _dpx_peer dpx_peer;
 
 // object tors
 void dpx_peer_free(dpx_peer *p);
-dpx_peer* dpx_peer_new(dpx_context *context);
+dpx_peer* dpx_peer_new();
 
 // functions
 dpx_channel* dpx_peer_open(dpx_peer *p, char *method); // method is copied
@@ -82,8 +87,12 @@ char* dpx_channel_method_set(dpx_channel *c, char* method); // returns old one
 struct _dpx_header_map;
 typedef struct _dpx_header_map dpx_header_map;
 
+// for internal dpx usage
+struct al_channel;
+typedef struct al_channel al_channel;
+
 struct _dpx_frame {
-	Channel *errCh;
+	al_channel *errCh;
 	dpx_channel *chanRef;
 
 	// below are meant to be modified.
@@ -110,3 +119,8 @@ char* dpx_frame_header_find(dpx_frame *frame, char* key);
 void dpx_frame_header_iter(dpx_frame *frame, void (*iter_func)(void* arg, char* k, char* v), void* arg);
 unsigned int dpx_frame_header_len(dpx_frame *frame);
 char* dpx_frame_header_rm(dpx_frame *frame, char* key);
+
+#ifdef __cplusplus
+}
+#endif
+#endif

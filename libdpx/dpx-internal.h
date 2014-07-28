@@ -1,8 +1,7 @@
-#include <ltchan.h>
-#include <lthread.h>
 #include <msgpack.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <task.h>
 #include <unistd.h>
 
 #include "dpx.h"
@@ -29,7 +28,7 @@ struct _dpx_a {
 typedef struct _dpx_a _dpx_a;
 
 // Communicator with the libtask thread
-void* _dpx_joinfunc(dpx_context *c, _dpx_a *a);
+void* _dpx_joinfunc(_dpx_a *a);
 
 // ------------------------- { forward declarations } -------------------------
 
@@ -44,13 +43,6 @@ typedef struct _dpx_frame dpx_frame;
 
 struct _dpx_peer;
 typedef struct _dpx_peer dpx_peer;
-
-// ----------------------------- { network ops } ------------------------------
-int netannounce(int istcp, char *server, int port);
-int netaccept(int fd, char *server, int *port);
-int sockaccept(int fd);
-int netlookup(char *name, uint32_t *ip);
-int netdial(int istcp, char *server, int port);
 
 // --------------------------------- { peer } ---------------------------------
 #define DPX_PEER_RETRYMS 1000
@@ -73,22 +65,21 @@ struct _dpx_peer_connection {
 typedef struct _dpx_peer_connection dpx_peer_connection;
 
 struct _dpx_peer {
-	LtLock *lock;
-	dpx_context *context;
+	QLock *lock;
 	
 	dpx_peer_listener *listeners; // listener fds
 	dpx_peer_connection *conns;
-	Channel* openFrames;
-	Channel* incomingChannels;
+	al_channel* openFrames;
+	al_channel* incomingChannels;
 	int closed;
 	int rrIndex;
 	int chanIndex;
 	int index;
-	Channel* firstConn;
+	al_channel* firstConn;
 };
 
 void _dpx_peer_free(dpx_peer *p);
-dpx_peer* _dpx_peer_new(dpx_context *context);
+dpx_peer* _dpx_peer_new();
 
 void _dpx_peer_accept_connection(dpx_peer *p, int fd);
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn);
@@ -105,16 +96,16 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port);
 #define DPX_CHANNEL_QUEUE_HWM 1024
 
 struct _dpx_channel {
-	LtLock *lock;
+	QLock *lock;
 	int id;
 	dpx_peer *peer;
-	Channel *connCh;
+	al_channel *connCh;
 	dpx_duplex_conn *conn;
 	int server;
 	int closed;
 	int last;
-	Channel *incoming;
-	Channel *outgoing;
+	al_channel *incoming;
+	al_channel *outgoing;
 	DPX_ERROR err;
 	char* method;
 };
@@ -165,10 +156,10 @@ struct dpx_channel_map {
 typedef struct dpx_channel_map dpx_channel_map;
 
 struct _dpx_duplex_conn {
-	LtLock *lock;
+	QLock *lock;
 	dpx_peer *peer;
 	int connfd;
-	Channel* writeCh;
+	al_channel* writeCh;
 	dpx_channel_map *channels;
 };
 
@@ -181,3 +172,42 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c);
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame);
 void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch);
 void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch);
+
+// --------------------------- { alchan } -------------------------------------
+#define ALCHAN_NONE -1
+#define ALCHAN_CLOSED -2
+#define ALCHAN_FULL -3
+
+// Create a channel. The channel will be filled with elements of size
+// 'elemsize' and will hold at most 'buffersize' elements before blocking.
+// (0 means block immediately for processing.)
+al_channel*	alchancreate(size_t elemsize, unsigned int buffersize);
+
+// Close a channel. No more elements will be accepted.
+void		alchanclose(al_channel *c);
+
+// Free a channel. Fails if there are still elements within.
+int			alchanfree(al_channel *c);
+
+// Receive elements.
+// Non-blocking.
+int				alchannbrecv(al_channel *c, void *v);
+void*			alchannbrecvp(al_channel *c);
+unsigned long	alchannbrecvul(al_channel *c);
+
+// Blocking. Waits for an element.
+int				alchanrecv(al_channel *c, void *v);
+void*			alchanrecvp(al_channel *c);
+unsigned long	alchanrecvul(al_channel *c);
+
+// Send elements.
+// Non-blocking.
+int				alchannbsend(al_channel *c, void *v);
+int				alchannbsendp(al_channel *c, void *v);
+int				alchannbsendul(al_channel *c, unsigned long v);
+
+// Blocking. If the buffer is full, waits until a slot opens.
+int				alchansend(al_channel *c, void *v);
+int				alchansendp(al_channel *c, void *v);
+int				alchansendul(al_channel *c, unsigned long v);
+

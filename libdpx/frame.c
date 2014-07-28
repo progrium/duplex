@@ -1,12 +1,12 @@
 #include "dpx-internal.h"
 
 void dpx_frame_free(dpx_frame *frame) {
-	chanclose(frame->errCh);
+	alchanclose(frame->errCh);
 	// empty channel
 	DPX_ERROR err;
-	while (chanrecv(frame->errCh, &err) != LTCHAN_CLOSED) {}
+	while (alchanrecv(frame->errCh, &err) != ALCHAN_CLOSED) {}
 
-	chanfree(frame->errCh);
+	alchanfree(frame->errCh);
 	if (frame->method != NULL)
 		free(frame->method);
 	if (frame->error != NULL)
@@ -21,9 +21,9 @@ void dpx_frame_free(dpx_frame *frame) {
 }
 
 dpx_frame* dpx_frame_new(dpx_channel *ch) {
-	dpx_frame *frame = (dpx_frame*) malloc(sizeof(dpx_frame));
+	dpx_frame *frame = malloc(sizeof(dpx_frame));
 
-	frame->errCh = chancreate(sizeof(DPX_ERROR), 0);
+	frame->errCh = alchancreate(sizeof(DPX_ERROR), 0);
 	frame->chanRef = ch;
 
 	frame->type = 0;

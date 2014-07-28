@@ -6,8 +6,9 @@
 #include "../dpx-internal.h"
 
 START_TEST(test_dpx_init) {
-	dpx_context *c = dpx_init();
-	dpx_cleanup(c);
+	dpx_init();
+	sleep(1);
+	dpx_cleanup();
 } END_TEST
 
 int test_function_ret = 4;
@@ -21,27 +22,27 @@ void* test_function(void* v) {
 }
 
 START_TEST(test_dpx_thread_communication) {
-	dpx_context *c = dpx_init();
+	dpx_init();
 
 	_dpx_a a;
 	a.function = &test_function;
 	int j = 10;
 	a.args = &j;
 
-	void* res = _dpx_joinfunc(c, &a);
+	void* res = _dpx_joinfunc(&a);
 
 	ck_assert_msg(res != NULL, "result is NULL?");
 	int cast = *(int*)res;
 	ck_assert_int_eq(test_function_ret, cast);
 
-	dpx_cleanup(c);
+	dpx_cleanup();
 } END_TEST
 
 START_TEST(test_dpx_peer_frame_send_receive) {
-	dpx_context *c = dpx_init();
+	dpx_init();
 
-	dpx_peer* p1 = dpx_peer_new(c);
-	dpx_peer* p2 = dpx_peer_new(c);
+	dpx_peer* p1 = dpx_peer_new();
+	dpx_peer* p2 = dpx_peer_new();
 
 	ck_assert_msg(dpx_peer_bind(p1, "127.0.0.1", 9876) == DPX_ERROR_NONE, "Error encountered trying to bind.");
 	ck_assert_msg(dpx_peer_connect(p2, "127.0.0.1", 9876) == DPX_ERROR_NONE, "Error encountered trying to connect.");
@@ -118,7 +119,7 @@ START_TEST(test_dpx_peer_frame_send_receive) {
 	dpx_peer_free(p1);
 	dpx_peer_free(p2);
 
-	dpx_cleanup(c);
+	dpx_cleanup();
 } END_TEST
 
 // WARNING: does not free orig
@@ -171,18 +172,16 @@ void* test_dpx_receive(void* v) {
 
 START_TEST(test_dpx_rpc_call) {
 
-	dpx_context *server_context = dpx_init();
+	dpx_init();
 
-	dpx_peer* server = dpx_peer_new(server_context);
+	dpx_peer* server = dpx_peer_new();
 	ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to bind.");
 
 	pthread_t server_thread;
 
 	pthread_create(&server_thread, NULL, &test_dpx_receive, server);
 
-	dpx_context *client_context = dpx_init();
-
-	dpx_peer* client = dpx_peer_new(client_context);
+	dpx_peer* client = dpx_peer_new();
 	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9877) == DPX_ERROR_NONE, "Error encountered trying to connect.");
 
 	char* payload = "123";
@@ -200,9 +199,8 @@ START_TEST(test_dpx_rpc_call) {
 	pthread_join(server_thread, NULL);
 
 	dpx_peer_close(client);
-	dpx_cleanup(client_context);
 
-	dpx_cleanup(server_context);
+	dpx_cleanup();
 
 } END_TEST
 
@@ -238,15 +236,14 @@ void* test_dpx_receive_id(void* v) {
 
 START_TEST(test_dpx_round_robin_async) {
 
-	dpx_context *client_context = dpx_init();
-	dpx_peer *client = dpx_peer_new(client_context);
+	dpx_init();
+	dpx_peer *client = dpx_peer_new();
 
 	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9876) == DPX_ERROR_NONE, "client failed to queue connect to 9876");
 	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9875) == DPX_ERROR_NONE, "client failed to queue connect to 9875");
 	ck_assert_msg(dpx_peer_bind(client, "127.0.0.1", 9874) == DPX_ERROR_NONE, "client failed to queue bind to 9874");
 
-	dpx_context *server1context = dpx_init();
-	dpx_peer* server1 = dpx_peer_new(server1context);
+	dpx_peer* server1 = dpx_peer_new();
 	ck_assert_msg(dpx_peer_bind(server1, "127.0.0.1", 9876) == DPX_ERROR_NONE, "server1 failed to queue bind to 9876");
 
 	struct _test_dri *t1 = malloc(sizeof(struct _test_dri));
@@ -256,8 +253,7 @@ START_TEST(test_dpx_round_robin_async) {
 	pthread_t server1thread;
 	pthread_create(&server1thread, NULL, &test_dpx_receive_id, t1);
 
-	dpx_context *server2context = dpx_init();
-	dpx_peer* server2 = dpx_peer_new(server2context);
+	dpx_peer* server2 = dpx_peer_new();
 	ck_assert_msg(dpx_peer_bind(server2, "127.0.0.1", 9875) == DPX_ERROR_NONE, "server2 failed to queue bind to 9875");
 
 	struct _test_dri *t2 = malloc(sizeof(struct _test_dri));
@@ -267,8 +263,7 @@ START_TEST(test_dpx_round_robin_async) {
 	pthread_t server2thread;
 	pthread_create(&server2thread, NULL, &test_dpx_receive_id, t2);
 
-	dpx_context *server3context = dpx_init();
-	dpx_peer* server3 = dpx_peer_new(server3context);
+	dpx_peer* server3 = dpx_peer_new();
 	ck_assert_msg(dpx_peer_connect(server3, "127.0.0.1", 9874) == DPX_ERROR_NONE, "server3 failed to queue connect to 9874");
 
 	struct _test_dri *t3 = malloc(sizeof(struct _test_dri));
@@ -335,23 +330,18 @@ START_TEST(test_dpx_round_robin_async) {
 	pthread_join(server3thread, NULL);
 
 	dpx_peer_close(client);
-	dpx_cleanup(client_context);
-	dpx_cleanup(server1context);
-	dpx_cleanup(server2context);
-	dpx_cleanup(server3context);
+	dpx_cleanup();
 
 } END_TEST
 
 START_TEST(test_dpx_async_messaging) {
 
-	dpx_context *client_context = dpx_init();
+	dpx_init();
 
-	dpx_peer* client = dpx_peer_new(client_context);
+	dpx_peer* client = dpx_peer_new();
 	ck_assert_msg(dpx_peer_connect(client, "127.0.0.1", 9873) == DPX_ERROR_NONE, "Error encountered trying to connect.");
 
-	dpx_context *server_context = dpx_init();
-
-	dpx_peer* server = dpx_peer_new(server_context);
+	dpx_peer* server = dpx_peer_new();
 	ck_assert_msg(dpx_peer_bind(server, "127.0.0.1", 9873) == DPX_ERROR_NONE, "Error encountered trying to bind.");
 
 	pthread_t server_thread;
@@ -374,8 +364,7 @@ START_TEST(test_dpx_async_messaging) {
 	pthread_join(server_thread, NULL);
 
 	dpx_peer_close(client);
-	dpx_cleanup(client_context);
-	dpx_cleanup(server_context);
+	dpx_cleanup();
 
 } END_TEST
 
