@@ -2,7 +2,16 @@ from ctypes import *
 
 class Frame(object):
 
-    def __init__(self, frame):
+    def __init__(self):
+        self.headers = {}
+        self.last = False
+        self.payload = bytearray([])
+        self.method = ''
+        self.error = ''
+
+    @classmethod
+    def from_c(cls, frame):
+        self = cls() 
         self.headers = {}
         self.last = (frame.last != 0)
         payload = []
@@ -25,6 +34,8 @@ class Frame(object):
         callback = CMPFUNC(frame_iter_helper)
 
         dpx.dpx_frame_header_iter(frame, callback, None)
+
+        return self
 
     def to_c(self):
         cframe = dpx.dpx_frame_new(None)

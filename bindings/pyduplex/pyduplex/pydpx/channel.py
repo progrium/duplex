@@ -24,7 +24,7 @@ class Channel(object):
         if frame is None:
             return None
 
-        our_frame = Frame(frame)
+        our_frame = Frame.from_c(frame)
         dpx.dpx_frame_free(frame)
         return our_frame
 

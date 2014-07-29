@@ -1,6 +1,8 @@
 from ctypes import *
 from pyduplex.pydpx.error import DpxError
 
+dpx = CDLL('libdpx.so')
+
 class Peer(object):
 
     def __init__(self):
