@@ -1,6 +1,6 @@
 package dpx
 
-// #cgo LDFLAGS: -ldpx -lltchan -llthread -lmsgpack
+// #cgo LDFLAGS: -ldpx -lmsgpack
 // #include <dpx.h>
 // #include <stdlib.h>
 import "C"
@@ -9,7 +9,13 @@ import (
 	"net"
 	"runtime"
 	"strconv"
+	"sync"
 	"unsafe"
+)
+
+var (
+	init_mutex = &sync.Mutex{}
+	has_init   = 0
 )
 
 type Peer struct {
@@ -17,8 +23,14 @@ type Peer struct {
 }
 
 func newPeer() *Peer {
-	context := C.dpx_init()
-	peer := C.dpx_peer_new(context)
+	init_mutex.Lock()
+	defer init_mutex.Unlock()
+	if has_init == 0 {
+		C.dpx_init()
+	}
+
+	peer := C.dpx_peer_new()
+	has_init++
 
 	p := &Peer{
 		peer: peer,
@@ -27,7 +39,14 @@ func newPeer() *Peer {
 	runtime.SetFinalizer(p, func(p *Peer) {
 		C.dpx_peer_close(p.peer)
 		C.dpx_peer_free(p.peer)
-		C.dpx_cleanup(context)
+
+		init_mutex.Lock()
+		defer init_mutex.Unlock()
+		has_init--
+
+		if has_init == 0 {
+			C.dpx_cleanup()
+		}
 	})
 
 	return p

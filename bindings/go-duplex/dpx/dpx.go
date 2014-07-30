@@ -2,7 +2,6 @@ package dpx
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -11,9 +10,12 @@ import (
 // This file contains the public API functions. They would
 // look like dpx_peer, dpx_connect, etc when ported to C (libtask)
 
-var CloseStreamErr = "CloseStream"
+var (
+	CloseStreamErr = "CloseStream"
+	debugMode      = true
 
-var debugMode = true
+	CurrentCodec Codec = &JSONCodec{}
+)
 
 func debug(v ...interface{}) {
 	if debugMode {
@@ -37,10 +39,6 @@ func Bind(peer *Peer, addr string) error {
 
 func Close(peer *Peer) error {
 	return peer.Close()
-}
-
-func Codec(peer *Peer, name string, codec interface{}) error {
-	return nil // TODO
 }
 
 // Channel operations
@@ -96,17 +94,21 @@ func Decode(ch *Channel, frame *Frame, obj interface{}) error {
 		return errors.New(frame.Error)
 	}
 	buffer := bytes.NewBuffer(frame.Payload)
-	decoder := json.NewDecoder(buffer)
+
+	decoder := CurrentCodec.Decoder(buffer)
 
 	return decoder.Decode(obj)
 }
 
 func Encode(ch *Channel, frame *Frame, obj interface{}) error {
-	bte, err := json.Marshal(obj)
-	if err != nil {
+	buffer := &bytes.Buffer{}
+	encoder := CurrentCodec.Encoder(buffer)
+
+	if err := encoder.Encode(obj); err != nil {
 		return err
 	}
-	frame.Payload = bte
+
+	frame.Payload = buffer.Bytes()
 	return nil
 }
 

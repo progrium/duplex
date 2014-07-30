@@ -10,7 +10,7 @@ check: $(BINARY)
 	./check_dpx
 
 CC=gcc
-CFLAGS=-Wall -I. -I.. -ggdb -Wl,-rpath .. -Wl,-Bstatic -L.. -ldpx -llthread -lltchan -Wl,-Bdynamic -lmsgpack -pthread `pkg-config --cflags --libs check`
+CFLAGS=-Wall -I. -I.. -ggdb -Wl,-rpath .. -L.. -ldpx -ltask -lmsgpack -pthread `pkg-config --cflags --libs check`
 
 %.o: %.c
 	$(CC) -c $*.c $(CFLAGS)

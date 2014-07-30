@@ -15,8 +15,10 @@ struct _dpx_context {
 // socket communication
 #define DPX_SOCK_LIMIT 1024
 
+dpx_context* c = NULL;
+
 // +communication function w/ libtask thread
-void* _dpx_joinfunc(dpx_context *c, _dpx_a *a) {
+void* _dpx_joinfunc(_dpx_a *a) {
 	int fd, len;
 	struct sockaddr_un sa;
 
@@ -59,8 +61,7 @@ void* _dpx_joinfunc(dpx_context *c, _dpx_a *a) {
 
 // +thread libtask
 void _dpx_libtask_handler(void* v) {
-	DEFINE_LTHREAD;
-	lthread_detach();
+	taskname("_dpx_libtask_handler");
 
 	int* store = v;
 	int remotesd = *store;
@@ -68,7 +69,9 @@ void _dpx_libtask_handler(void* v) {
 
 	_dpx_a *ptr = NULL;
 
-	int res = lthread_read(remotesd, &ptr, sizeof(void*), 0);
+	fdnoblock(remotesd);
+
+	int res = fdread(remotesd, &ptr, sizeof(void*));
 	if (res != sizeof(void*)) {
 		fprintf(stderr, "failed to handle read\n");
 		abort(); // FIXME ?
@@ -76,7 +79,7 @@ void _dpx_libtask_handler(void* v) {
 
 	void* result = ptr->function(ptr->args);
 
-	if (lthread_write(remotesd, &result, sizeof(void*)) != sizeof(void*)) {
+	if (fdwrite(remotesd, &result, sizeof(void*)) != sizeof(void*)) {
 		fprintf(stderr, "failed to write back result\n");
 		abort(); // FIXME ?
 	}
@@ -86,11 +89,7 @@ void _dpx_libtask_handler(void* v) {
 
 // +thread libtask
 void _dpx_libtask_checker(void* v) {
-	dpx_context *c = v;
-
-	lthread_detach();
-	DEFINE_LTHREAD;
-	//taskname("dpx_libtask_checker_%s", c->name);
+	taskname("dpx_libtask_checker");
 	
 	if (listen(c->task_sock, DPX_SOCK_LIMIT) == -1) {
 		fprintf(stderr, "failed to listen");
@@ -100,7 +99,6 @@ void _dpx_libtask_checker(void* v) {
 	int again = 0;
 
 	while(1) {
-		lthread_t *lt;
 		int remotesd;
 
 		if ((remotesd = sockaccept(c->task_sock)) == -1) {
@@ -119,24 +117,26 @@ void _dpx_libtask_checker(void* v) {
 		int* store = malloc(sizeof(int));
 		*store = remotesd;
 
-		lthread_create(&lt, &_dpx_libtask_handler, store);
+		taskcreate(&_dpx_libtask_handler, store, DPX_TASK_STACK_SIZE);
 	}
 }
 
 // +thread libtask
 void* _dpx_libtask_thread(void* v) {
-	lthread_t *lt = NULL;
+	taskinit(&_dpx_libtask_checker, v);
 
-	lthread_create(&lt, &_dpx_libtask_checker, v);
-	lthread_run();
-
-	fprintf(stderr, "lthread thread ended unexpectedly");
+	fprintf(stderr, "libtask thread ended unexpectedly");
 	abort();
 	return NULL;
 }
 
 // Initialise the coroutines on a seperate thread.
-dpx_context* dpx_init() {
+void dpx_init() {
+	if (c != NULL) {
+		fprintf(stderr, "Existing global context exists!\n");
+		abort();
+	}
+
 	struct sockaddr_un local;
 
 	int task_sock;
@@ -174,17 +174,20 @@ dpx_context* dpx_init() {
 
 	printf("dpx_init: sock @ %s\n", name);
 
-	dpx_context *ret = calloc(1, sizeof(dpx_context));
-	ret->task_sock = task_sock;
-	ret->name = name;
+	c = calloc(1, sizeof(dpx_context));
+	c->task_sock = task_sock;
+	c->name = name;
 
-	pthread_create(&ret->task_thread, NULL, &_dpx_libtask_thread, ret);
-	pthread_detach(ret->task_thread);
-
-	return ret;
+	pthread_create(&c->task_thread, NULL, &_dpx_libtask_thread, NULL);
+	pthread_detach(c->task_thread);
 }
 
-void dpx_cleanup(dpx_context *c) {
+void dpx_cleanup() {
+	if (c == NULL) {
+		fprintf(stderr, "Context not set!\n");
+		abort();
+	}
+
 	printf("dpx_cleanup: sock @ %s\n", c->name);
 	unlink(c->name);
 	pthread_cancel(c->task_thread);
@@ -192,4 +195,5 @@ void dpx_cleanup(dpx_context *c) {
 
 	free(c->name);
 	free(c);
+	c = NULL;
 }

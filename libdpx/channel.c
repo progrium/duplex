@@ -11,7 +11,7 @@ void dpx_channel_free(dpx_channel *c) {
 	a.function = &_dpx_channel_free_helper;
 	a.args = c;
 
-	_dpx_joinfunc(c->peer->context, &a);
+	_dpx_joinfunc(&a);
 }
 
 struct _dpx_channel_close_hs {
@@ -35,7 +35,7 @@ void dpx_channel_close(dpx_channel *c, DPX_ERROR reason) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(c->peer->context, &a);
+	_dpx_joinfunc(&a);
 }
 
 struct _dpx_channel_error_hs {
@@ -58,7 +58,7 @@ DPX_ERROR dpx_channel_error(dpx_channel *c) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(c->peer->context, &a);
+	_dpx_joinfunc(&a);
 	return h.err;
 }
 
@@ -71,7 +71,7 @@ dpx_frame* dpx_channel_receive_frame(dpx_channel *c) {
 	a.function = &_dpx_channel_receive_frame_helper;
 	a.args = c;
 
-	return (dpx_frame*) _dpx_joinfunc(c->peer->context, &a);
+	return (dpx_frame*) _dpx_joinfunc(&a);
 }
 
 struct _dpx_channel_send_frame_hs {
@@ -96,7 +96,7 @@ DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 
 	a.args = &h;
 
-	_dpx_joinfunc(c->peer->context, &a);
+	_dpx_joinfunc(&a);
 	return h.err;
 }
 
@@ -124,7 +124,7 @@ char* dpx_channel_method_set(dpx_channel *c, char* method) {
 
 	a.args = &h;
 
-	void* ret = _dpx_joinfunc(c->peer->context, &a);
+	void* ret = _dpx_joinfunc(&a);
 
 	return (char*)ret;
 }
@@ -134,19 +134,19 @@ char* dpx_channel_method_set(dpx_channel *c, char* method) {
 dpx_channel* _dpx_channel_new() {
 	dpx_channel* ptr = (dpx_channel*) malloc(sizeof(dpx_channel));
 
-	ptr->lock = ltlockcreate();
+	ptr->lock = calloc(1, sizeof(QLock));
 	ptr->id = 0;
 
 	ptr->peer = NULL;
-	ptr->connCh = chancreate(sizeof(dpx_duplex_conn*), 0);
+	ptr->connCh = alchancreate(sizeof(dpx_duplex_conn*), 0);
 	ptr->conn = NULL;
 
 	ptr->server = 0;
 	ptr->closed = 0;
 	ptr->last = 0;
 
-	ptr->incoming = chancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
-	ptr->outgoing = chancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
+	ptr->incoming = alchancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
+	ptr->outgoing = alchancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
 
 	ptr->err = 0;
 	ptr->method = NULL;
@@ -160,9 +160,9 @@ void _dpx_channel_free(dpx_channel* c) {
 	// give it time to cleanup. [FIXME this might freeze]
 	//lthread_sleep(100);
 
-	chanfree(c->connCh);
-	chanfree(c->incoming);
-	chanfree(c->outgoing);
+	alchanfree(c->connCh);
+	alchanfree(c->incoming);
+	alchanfree(c->outgoing);
 
 	free(c->lock);
 	free(c->method);
@@ -179,8 +179,7 @@ dpx_channel* _dpx_channel_new_client(dpx_peer *p, char* method) {
 
 	p->chanIndex += 1;
 
-	lthread_t *lt;
-	lthread_create(&lt, &_dpx_channel_pump_outgoing, ptr);
+	taskcreate(&_dpx_channel_pump_outgoing, ptr, DPX_TASK_STACK_SIZE);
 	return ptr;
 }
 
@@ -196,15 +195,13 @@ dpx_channel* _dpx_channel_new_server(dpx_duplex_conn *conn, dpx_frame *frame) {
 	strcpy(methodcpy, frame->method);
 	ptr->method = methodcpy;
 
-	lthread_t *lt;
-
-	lthread_create(&lt, &_dpx_channel_pump_outgoing, ptr);
+	taskcreate(&_dpx_channel_pump_outgoing, ptr, DPX_TASK_STACK_SIZE);
 	_dpx_duplex_conn_link_channel(conn, ptr);
 	return ptr;
 }
 
 void _dpx_channel_close(dpx_channel *c, DPX_ERROR err) {
-	ltlock(c->lock);
+	qlock(c->lock);
 
 	if (c->closed) {
 		goto _dpx_channel_close_cleanup;
@@ -214,12 +211,12 @@ void _dpx_channel_close(dpx_channel *c, DPX_ERROR err) {
 
 	_dpx_duplex_conn_unlink_channel(c->conn, c);
 
-	chanclose(c->connCh);
-	chanclose(c->incoming);
-	chanclose(c->outgoing);
+	alchanclose(c->connCh);
+	alchanclose(c->incoming);
+	alchanclose(c->outgoing);
 
 _dpx_channel_close_cleanup:
-	ltunlock(c->lock);
+	qunlock(c->lock);
 }
 
 struct _dpx_channel_close_via_task_struct {
@@ -228,17 +225,15 @@ struct _dpx_channel_close_via_task_struct {
 };
 
 void _dpx_channel_close_via_task(struct _dpx_channel_close_via_task_struct *s) {
-	DEFINE_LTHREAD;
-	lthread_detach();
-	//taskname("_dpx_channel_close_via_task_%d", s->c->id);
+	taskname("_dpx_channel_close_via_task_%d", s->c->id);
 	_dpx_channel_close(s->c, s->err);
 	free(s);
 }
 
 DPX_ERROR _dpx_channel_error(dpx_channel *c) {
-	ltlock(c->lock);
+	qlock(c->lock);
 	DPX_ERROR ret = c->err;
-	ltunlock(c->lock);
+	qunlock(c->lock);
 	return ret;
 }
 
@@ -248,9 +243,9 @@ dpx_frame* _dpx_channel_receive_frame(dpx_channel *c) {
 	}
 
 	dpx_frame* frame;
-	int ok = chanrecv(c->incoming, &frame);
+	int ok = alchanrecv(c->incoming, &frame);
 	// FIXME is cleanup needed on this dpx_frame if not okay? (e.g. free)
-	if (ok == LTCHAN_CLOSED) {
+	if (ok == ALCHAN_CLOSED) {
 		return NULL;
 	}
 
@@ -266,7 +261,7 @@ dpx_frame* _dpx_channel_receive_frame(dpx_channel *c) {
 }
 
 DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
-	ltlock(c->lock);
+	qlock(c->lock);
 	DPX_ERROR ret = DPX_ERROR_NONE;
 
 	if (c->err) {
@@ -285,15 +280,15 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 
 	printf("(%d) Sending DATA frame for channel %d\n", c->peer->index, c->id);
 
-	chansend(c->outgoing, &frame);
+	alchansend(c->outgoing, &frame);
 
 _dpx_channel_send_frame_cleanup:
-	ltunlock(c->lock);
+	qunlock(c->lock);
 	return ret;
 }
 
 int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
-	ltlock(c->lock);
+	qlock(c->lock);
 
 	int ret = 0;
 
@@ -305,49 +300,47 @@ int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
 		struct _dpx_channel_close_via_task_struct *s = malloc(sizeof(struct _dpx_channel_close_via_task_struct));
 		s->c = c;
 		s->err = DPX_ERROR_CHAN_FRAME;
-		lthread_t *lt;
-		lthread_create(&lt, &_dpx_channel_close_via_task, s);
+		taskcreate(&_dpx_channel_close_via_task, s, DPX_TASK_STACK_SIZE);
 		ret = 1;
 		goto _dpx_channel_handle_incoming_cleanup;
 	}
 
-	chansend(c->incoming, &frame);
+	alchansend(c->incoming, &frame);
 	ret = 1;
 
 _dpx_channel_handle_incoming_cleanup:
-	ltunlock(c->lock);
+	qunlock(c->lock);
 	return ret;
 }
 
 void _dpx_channel_pump_outgoing(dpx_channel *c) {
-	DEFINE_LTHREAD;
-	lthread_detach();
+	taskname("_dpx_channel_pump_outgoing [%d/%d]", c->peer->index, c->id);
 
 	printf("(%d) Pumping started for channel %d\n", c->peer->index, c->id);
-	chanrecv(c->connCh, &c->conn);
+	alchanrecv(c->connCh, &c->conn);
 	printf("(%d) Received initial connection for channel %d\n", c->peer->index, c->id);
 
 	while(1) {
 
 		dpx_duplex_conn *conn;
-		int hasConn = channbrecv(c->connCh, &conn);
-		if (hasConn == LTCHAN_CLOSED)
+		int hasConn = alchannbrecv(c->connCh, &conn);
+		if (hasConn == ALCHAN_CLOSED)
 			goto _dpx_channel_pump_outgoing_cleanup;
-		else if (hasConn != LTCHAN_NONE)
+		else if (hasConn != ALCHAN_NONE)
 			c->conn = conn;
 
 		dpx_frame *frame;
-		int hasFrame = channbrecv(c->outgoing, &frame);
-		if (hasFrame == LTCHAN_CLOSED)
+		int hasFrame = alchannbrecv(c->outgoing, &frame);
+		if (hasFrame == ALCHAN_CLOSED)
 			goto _dpx_channel_pump_outgoing_cleanup;
-		else if (hasFrame != LTCHAN_NONE) {
+		else if (hasFrame != ALCHAN_NONE) {
 			while(1) {
 				printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
 				DPX_ERROR err = _dpx_duplex_conn_write_frame(c->conn, frame);
 				if (err) {
 					printf("(%d) Error sending frame: %lu\n", c->peer->index, err);
 
-					if (chanrecv(c->connCh, &c->conn) == LTCHAN_CLOSED)
+					if (alchanrecv(c->connCh, &c->conn) == ALCHAN_CLOSED)
 						goto _dpx_channel_pump_outgoing_cleanup;
 					
 					continue;
@@ -361,7 +354,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 			}
 		}
 
-		lthread_sleep(50);
+		taskdelay(50);
 	}
 
 _dpx_channel_pump_outgoing_cleanup:

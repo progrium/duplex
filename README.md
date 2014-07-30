@@ -42,8 +42,7 @@ The basic workflow for using `dpx-c` is the following:
 
 #### Requirements:
 
-* [lthread](https://github.com/halayli/lthread)
-* [ltchan](https://github.com/robxu9/ltchan)
+* [libtask](https://github.com/robxu9/duplex/tree/master/vendor/libtask)
 * [msgpack-c](https://github.com/msgpack/msgpack-c)
 * For testing: [check](http://check.sourceforge.net)
 
@@ -52,17 +51,17 @@ Compile with `make`, test with `make check`, install with `make install`.
 
 #### Troubles:
 
-* lthread has trouble being a shared library (which prevents duplex from being a shared library): see [robxu9/duplex#2](https://github.com/robxu9/duplex/issues/2).
+* bindings may not cleanup the socket left in `/tmp/dpxc_*`. Not really troublesome, but it can pile up.
 
 ### Bindings around libdpx (bindings)
 
 #### go-duplex (high level api for golang)
 
-Uses `go-dpx` to JSON encode objects for sending over to other applications. You must have `dpx-c` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex`.
+Uses `go-dpx` to JSON encode objects for sending over to other applications. You must have `libdpx` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex`.
 
 #### go-dpx (low level api for golang)
 
-Interacts directly with `dpx-c`. You must have `dpx-c` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex/dpx`.
+Interacts directly with `libdpx`. You must have `libdpx` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex/dpx`.
 
 ## How it works
 
