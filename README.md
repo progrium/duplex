@@ -63,6 +63,10 @@ Uses `go-dpx` to JSON encode objects for sending over to other applications. You
 
 Interacts directly with `libdpx`. You must have `libdpx` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex/dpx`.
 
+#### pydpx (low level api for python2)
+
+Via `ctypes`. Seems to work well. You must have `libdpx` installed on your system prior to running `python setup.py install`.
+
 ## How it works
 
 Duplex is made for RPC, but at its core is actually a powerful system for managing channels of streams between Duplex peers.
