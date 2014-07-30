@@ -1,34 +1,60 @@
 from ctypes import *
 from pyduplex.pydpx.error import DpxError
-from pyduplex.pydpx.peer import Peer
-from pyduplex.pydpx.frame import Frame
+from pyduplex.pydpx.frame import CFRAME, Frame
+
+dpx = CDLL('libdpx.so')
 
 class Channel(object):
     def __init__(self, cchan):
         self.chan = cchan
 
     def free(self):
-        dpx.dpx_channel_free(self.chan)
+        dcf = dpx.dpx_channel_free
+        dcf.argtypes = [c_void_p]
+
+        dcf(self.chan)
 
     def method(self):
-        return c_char_p(dpx.dpx_channel_method_get(self.chan)).value
+        dcmg = dpx.dpx_channel_method_get
+        dcmg.argtypes = [c_void_p]
+        dcmg.restype = c_char_p
+
+        return dcmg(self.chan)
 
     def error(self):
-        err = c_int(dpx.dpx_channel_error(self.chan))
-        if err.value == 0:
+        dce = dpx.dpx_channel_error
+        dce.argtypes = [c_void_p]
+        dce.restype = c_int
+
+        err = dce(self.chan)
+        if err == 0:
             return None
-        return DpxError(err.value)
+        return DpxError(err)
 
     def receive(self):
-        frame = dpx.dpx_channel_receive_frame(self.chan)
+        dcrf = dpx.dpx_channel_receive_frame
+        dcrf.argtypes = [c_void_p]
+        dcrf.restype = POINTER(CFRAME)
+
+        frame = dcrf(self.chan)
         if frame is None:
             return None
 
         our_frame = Frame.from_c(frame)
-        dpx.dpx_frame_free(frame)
+
+        dff = dpx.dpx_frame_free
+        dff.argtypes = [c_void_p]
+        dff(frame)
+
         return our_frame
 
     def send(self, frame):
-        err = c_int(dpx.dpx_channel_send_frame(self.chan, frame.to_c()))
-        if err.value != 0:
-            raise DpxError(err.value)
+        dcsf = dpx.dpx_channel_send_frame
+        dcsf.argtypes = [c_void_p, POINTER(CFRAME)]
+        dcsf.restype = c_int
+
+        cframe = frame.to_c()
+
+        err = dcsf(self.chan, cframe)
+        if err != 0:
+            raise DpxError(err)

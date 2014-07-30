@@ -1,5 +1,19 @@
 from ctypes import *
 
+dpx = CDLL('libdpx.so')
+
+class CFRAME(Structure):
+    _fields_ = [('errCh', c_void_p),
+                ('chanRef', c_void_p),
+                ('type', c_int),
+                ('channel', c_int),
+                ('method', c_char_p),
+                ('headers', c_void_p),
+                ('error', c_char_p),
+                ('last', c_int),
+                ('payload', POINTER(c_byte)),
+                ('payloadSize', c_int)]
+
 class Frame(object):
 
     def __init__(self):
@@ -11,55 +25,80 @@ class Frame(object):
 
     @classmethod
     def from_c(cls, frame):
-        self = cls() 
+        aframe = frame[0]
+
+        self = cls()
         self.headers = {}
-        self.last = (frame.last != 0)
+        if aframe.last != 0:
+            self.last = True
+        else:
+            self.last = False
+
         payload = []
 
-        for i in range(c_ulong(frame.payloadSize).value):
-            payload.append(frame.payload[i])
+        for i in range(aframe.payloadSize):
+            payload.append(aframe.payload[i])
 
         self.payload = bytearray(payload)
 
-        if frame.method is not None:
-            self.method = c_char_p(frame.method)
+        if aframe.method is not None:
+            self.method = aframe.method
 
-        if frame.error is not None:
-            self.error = c_char_p(frame.error)
+        if aframe.error is not None:
+            self.error = aframe.error
 
         def frame_iter_helper(ptr, k, v):
-            self.headers[c_char_p(k).value] = c_char_p(v).value
+            self.headers[k] = v
 
         CMPFUNC = CFUNCTYPE(None, c_void_p, c_char_p, c_char_p)
         callback = CMPFUNC(frame_iter_helper)
 
-        dpx.dpx_frame_header_iter(frame, callback, None)
+        dfhi = dpx.dpx_frame_header_iter
+        dfhi.argtypes = [POINTER(CFRAME), c_void_p, c_void_p]
+
+        dfhi(frame, callback, None)
 
         return self
 
     def to_c(self):
-        cframe = dpx.dpx_frame_new(None)
-        cframe.method = c_char_p(self.method)
-        cframe.error = c_char_p(self.error)
+        dfn = dpx.dpx_frame_new
+        dfn.argtypes = [c_void_p]
+        dfn.restype = POINTER(CFRAME)
+
+        cframeptr = dfn(None)
+
+        cframe = cframeptr[0]
+
+        cframe.method = self.method
+        cframe.error = self.error
         cframe.headers = None
 
-        if frame.Last:
-            cframe.last = c_int(1)
+        if self.last:
+            cframe.last = 1
         else:
-            cframe.last = c_int(0)
+            cframe.last = 0
+
+        dfha = dpx.dpx_frame_header_add
+        dfha.argtypes = [c_void_p, c_char_p, c_char_p]
 
         for k in self.headers:
-            dpx.dpx_frame_header_add(cframe, c_char_p(k), c_char_p(self.headers[k]))
+            dfha(cframe, k, self.headers[k])
 
         if len(self.payload) != 0:
-            cframe.payloadSize = c_ulong(len(self.payload))
+            cframe.payloadSize = len(self.payload)
 
             libc = CDLL('libc.so.6')
-            cframe.payload = libc.malloc(cframe.payloadSize)
+            malloc = libc.malloc
+            malloc.argtypes = [c_size_t]
+            malloc.restype = c_void_p
 
-            payload = cast(cframe.payload, POINTER(c_byte))
+            malloced = malloc(len(self.payload))
+
+            payload = cast(malloced, POINTER(c_byte))
 
             for i in range(len(self.payload)):
                 payload[i] = self.payload[i]
 
-        return cframe
+            cframe.payload = payload
+
+        return cframeptr
