@@ -148,6 +148,7 @@ void test_dpx_call(dpx_peer* peer, char* method, char* payload, int payload_size
 	*receive = resp->payload;
 	*receive_size = resp->payloadSize;
 	dpx_frame_free(resp);
+	dpx_channel_free(chan);
 }
 
 void* test_dpx_receive(void* v) {
@@ -167,6 +168,8 @@ void* test_dpx_receive(void* v) {
 			printf("payload: %.*s, payload size: %d\n", 3, resp->payload, resp->payloadSize);
 			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
 		}
+		// FIXME We cannot free because we have pending ops
+		//dpx_channel_free(chan);
 	}
 }
 
@@ -231,6 +234,8 @@ void* test_dpx_receive_id(void* v) {
 			printf("payload: %.*s, payload size: %d\n", 4, resp->payload, resp->payloadSize);
 			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
 		}
+		// FIXME we cannot free because we have pending ops
+		//dpx_channel_free(chan);
 	}
 }
 

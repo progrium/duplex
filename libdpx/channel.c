@@ -157,9 +157,6 @@ dpx_channel* _dpx_channel_new() {
 void _dpx_channel_free(dpx_channel* c) {
 	_dpx_channel_close(c, DPX_ERROR_FREEING);
 
-	// give it time to cleanup. [FIXME this might freeze]
-	//lthread_sleep(100);
-
 	alchanfree(c->connCh);
 	alchanfree(c->incoming);
 	alchanfree(c->outgoing);
@@ -217,6 +214,8 @@ void _dpx_channel_close(dpx_channel *c, DPX_ERROR err) {
 
 _dpx_channel_close_cleanup:
 	qunlock(c->lock);
+	// yield tasks
+	taskdelay(50);
 }
 
 struct _dpx_channel_close_via_task_struct {
@@ -354,7 +353,9 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 			}
 		}
 
-		taskdelay(50);
+		if (!c->closed) {
+			taskdelay(10);
+		}
 	}
 
 _dpx_channel_pump_outgoing_cleanup:

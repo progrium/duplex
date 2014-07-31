@@ -37,15 +37,14 @@ def test_peer_frame_send_receive(basic):
     client_output = client_chan.receive()
     assert client_output.payload == server_output.payload
 
+    server_chan.free()
+    client_chan.free()
+
     s1.close()
     s2.close()
 
     s1.free()
     s2.free()
-
-    # FIXME HOW DO WE CLEANUP THESE CHANNELS?!?!?!
-    # server_chan.free()
-    # client_chan.free()
 
 def call(peer, method, payload):
     channel = peer.open(method)
@@ -54,6 +53,7 @@ def call(peer, method, payload):
     request.last = True
     channel.send(request)
     response = channel.receive()
+    channel.free()
     return response.payload
 
 def test_rpc_call(basic):
