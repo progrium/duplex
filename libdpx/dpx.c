@@ -1,4 +1,5 @@
 #include "dpx-internal.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -96,23 +97,14 @@ void _dpx_libtask_checker(void* v) {
 		abort();
 	}
 
-	int again = 0;
-
 	while(1) {
 		int remotesd;
 
 		if ((remotesd = sockaccept(c->task_sock)) == -1) {
-			if (!again) {
-				fprintf(stderr, "failed to accept, trying again\n");
-				again = 1;
-				continue;
-			} else {
-				fprintf(stderr, "failed to accept again, context exiting\n");
-				return;
-			}
+            perror("failed to accept request: ");
+            taskdelay(50);
+            continue;
 		}
-
-		again = 0;
 
 		int* store = malloc(sizeof(int));
 		*store = remotesd;
