@@ -449,14 +449,25 @@ void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
 	dpx_peer *p = param->p;
 	int connfd = param->connfd;
 
+	int again = 0;
+
 	while(1) {
 		char server[16];
 		int port;
 		int fd = netaccept(connfd, server, &port);
 		if (fd < 0) {
-			printf("failed to receive connection...\n");
-			break;
+			printf("failed to receive connection... ");
+
+			if (!again) {
+				printf("trying again\n");
+				again = 1;
+				continue;
+			} else {
+				printf("bind task is now dying\n");
+				break;
+			}
 		}
+		again = 0;
 		printf("accepted connection from %.*s:%d\n", 16, server, port);
 		struct _dpx_peer_bind_task_param *ap = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
 		ap->p = p;
