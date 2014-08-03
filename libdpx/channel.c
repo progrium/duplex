@@ -244,6 +244,7 @@ dpx_frame* _dpx_channel_receive_frame(dpx_channel *c) {
 	dpx_frame* frame;
 	int ok = alchanrecv(c->incoming, &frame);
 	// FIXME is cleanup needed on this dpx_frame if not okay? (e.g. free)
+	// FIXME YES
 	if (ok == ALCHAN_CLOSED) {
 		return NULL;
 	}
@@ -276,8 +277,6 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 	frame->chanRef = c;
 	frame->channel = c->id;
 	frame->type = DPX_FRAME_DATA;
-
-	printf("(%d) Sending DATA frame for channel %d\n", c->peer->index, c->id);
 
 	alchansend(c->outgoing, &frame);
 
@@ -315,17 +314,15 @@ _dpx_channel_handle_incoming_cleanup:
 void _dpx_channel_pump_outgoing(dpx_channel *c) {
 	taskname("_dpx_channel_pump_outgoing [%d/%d]", c->peer->index, c->id);
 
-	printf("(%d) Pumping started for channel %d\n", c->peer->index, c->id);
+	DEBUG_FUNC(printf("(%d) Pumping started for channel %d\n", c->peer->index, c->id));
 	alchanrecv(c->connCh, &c->conn);
-	printf("(%d) Received initial connection for channel %d\n", c->peer->index, c->id);
+	DEBUG_FUNC(printf("(%d) Received initial connection for channel %d\n", c->peer->index, c->id));
 
 	while(1) {
 
 		dpx_duplex_conn *conn;
 		int hasConn = alchannbrecv(c->connCh, &conn);
-		if (hasConn == ALCHAN_CLOSED)
-			goto _dpx_channel_pump_outgoing_cleanup;
-		else if (hasConn != ALCHAN_NONE)
+		if (hasConn != ALCHAN_NONE)
 			c->conn = conn;
 
 		dpx_frame *frame;
@@ -334,10 +331,10 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 			goto _dpx_channel_pump_outgoing_cleanup;
 		else if (hasFrame != ALCHAN_NONE) {
 			while(1) {
-				printf("(%d) Sending frame: %d bytes\n", c->peer->index, frame->payloadSize);
+				DEBUG_FUNC(printf("(%d) Sending data frame for channel %d: %d bytes\n", c->peer->index, c->id, frame->payloadSize));
 				DPX_ERROR err = _dpx_duplex_conn_write_frame(c->conn, frame);
 				if (err) {
-					printf("(%d) Error sending frame: %lu\n", c->peer->index, err);
+					fprintf(stderr, "(%d) Error sending frame: %lu\n", c->peer->index, err);
 
 					if (alchanrecv(c->connCh, &c->conn) == ALCHAN_CLOSED)
 						goto _dpx_channel_pump_outgoing_cleanup;
@@ -354,12 +351,12 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 		}
 
 		if (!c->closed) {
-			taskdelay(10);
+			taskdelay(0); // FIXME investigate why taskyield doesn't work
 		}
 	}
 
 _dpx_channel_pump_outgoing_cleanup:
-	printf("(%d) Pumping finished for channel %d\n", c->peer->index, c->id);
+	DEBUG_FUNC(printf("(%d) Pumping finished for channel %d\n", c->peer->index, c->id));
 	c->conn = NULL;
 }
 

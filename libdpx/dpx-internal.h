@@ -16,6 +16,16 @@
 #define UDP 0
 #define TCP 1
 
+#if defined(DEBUG) | defined(_DEBUG)
+	#ifndef DEBUG_FUNC
+		#define DEBUG_FUNC(...) do { __VA_ARGS__; } while(0)
+	#endif
+#else
+	#ifndef DEBUG_FUNC
+		#define DEBUG_FUNC(...)
+	#endif
+#endif
+
 // -------------------------------- { errors } --------------------------------
 // [ declarations have been moved to dpx.h in order for clients to utilise it ]
 

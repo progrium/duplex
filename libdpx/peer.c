@@ -210,7 +210,7 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 	add->conn = dc;
 	add->next = NULL;
 
-	printf("(%d) Accepting connection.\n", p->index);
+	DEBUG_FUNC(printf("(%d) Accepting connection.\n", p->index));
 
 	dpx_peer_connection* conn = p->conns;
 	if (conn == NULL) {
@@ -264,7 +264,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 
 	while(1) {
 		alchanrecvp(p->firstConn); // we don't care about the ret value
-		printf("(%d) First connection, routing...\n", p->index);
+		DEBUG_FUNC(printf("(%d) First connection, routing...\n", p->index));
 
 		while (_dpx_peer_connlen(p) > 0) {
 			if (err == DPX_ERROR_NONE) {
@@ -274,7 +274,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 
 			dpx_duplex_conn* conn;
 			int index = _dpx_peer_next_conn(p, &conn);
-			printf("(%d) Sending OPEN frame [%d]: %d bytes\n", p->index, index, frame->payloadSize);
+			DEBUG_FUNC(printf("(%d) Sending OPEN frame [%d]: %d bytes\n", p->index, index, frame->payloadSize));
 			err = _dpx_duplex_conn_write_frame(conn, frame);
 			if (err == DPX_ERROR_NONE)
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
@@ -382,19 +382,19 @@ void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
 
 	int i;
 	for (i=0; i < DPX_PEER_RETRYATTEMPTS; i++) {
-		printf("(%d) Connecting to %s:%d\n", p->index, addr, port);
+		DEBUG_FUNC(printf("(%d) Connecting to %s:%d\n", p->index, addr, port));
 		int connfd = netdial(TCP, addr, port);
 		if (connfd < 0) {
-			printf("(%d) Failed to connect to %s:%d... Attempt %d/%d.\n", p->index, addr, port, i+1, DPX_PEER_RETRYATTEMPTS);
+			fprintf(stderr, "(%d) Failed to connect to %s:%d... Attempt %d/%d.\n", p->index, addr, port, i+1, DPX_PEER_RETRYATTEMPTS);
 			taskdelay(DPX_PEER_RETRYMS);
 			continue;
 		}
 		if (_dpx_peer_send_greeting(connfd) != DPX_ERROR_NONE) {
-			printf("(%d) Failed to make greeting...\n", p->index);
+			fprintf(stderr, "(%d) Failed to make greeting...\n", p->index);
 			close(connfd);
 			goto _dpx_peer_connect_task_cleanup;
 		}
-		printf("(%d) Connected.\n", p->index);
+		DEBUG_FUNC(printf("(%d) Connected.\n", p->index));
 		_dpx_peer_accept_connection(p, connfd);
 		goto _dpx_peer_connect_task_cleanup;
 	}
@@ -456,19 +456,20 @@ void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
 		int port;
 		int fd = netaccept(connfd, server, &port);
 		if (fd < 0) {
-			printf("failed to receive connection... ");
+			fprintf(stderr, "failed to receive connection... ");
 
 			if (!again) {
-				printf("trying again\n");
+				fprintf(stderr, "trying again\n");
 				again = 1;
+				taskdelay(0);
 				continue;
 			} else {
-				printf("bind task is now dying\n");
+				fprintf(stderr, "bind task is now dying\n");
 				break;
 			}
 		}
 		again = 0;
-		printf("accepted connection from %.*s:%d\n", 16, server, port);
+		DEBUG_FUNC(printf("accepted connection from %.*s:%d\n", 16, server, port));
 		struct _dpx_peer_bind_task_param *ap = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
 		ap->p = p;
 		ap->connfd = fd;
@@ -507,7 +508,7 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 		l->next = add;
 	}
 
-	printf("(%d) Now listening on %s:%d\n", p->index, addr, port);
+	DEBUG_FUNC(printf("(%d) Now listening on %s:%d\n", p->index, addr, port));
 
 	struct _dpx_peer_bind_task_param *param = (struct _dpx_peer_bind_task_param*) malloc(sizeof(struct _dpx_peer_bind_task_param));
 	param->p = p;

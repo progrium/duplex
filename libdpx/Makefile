@@ -20,6 +20,12 @@ OFILES=\
 CC=gcc
 CFLAGS=-Wall -Werror=implicit-function-declaration -I. -ggdb -ltask -lmsgpack -pthread
 
+DEBUG ?= 0
+ifeq ($(DEBUG), 1)
+    CFLAGS += -DDEBUG
+endif
+
+
 %.o: %.c
 	$(CC) -c $*.c $(CFLAGS) -fPIC
 

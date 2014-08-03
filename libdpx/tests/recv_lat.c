@@ -47,6 +47,8 @@ main(int argc, char* argv[])
 		}
 	}
 
+	sleep(5);
+
 	dpx_channel_free(chan);
 	dpx_peer_close(p);
 

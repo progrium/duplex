@@ -109,8 +109,10 @@ char* dpx_frame_header_rm(dpx_frame *frame, char* key) {
 // ----------------------------------------------------------------------------
 
 dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
-	msgpack_object_print(stdout, *obj);
-	puts("");
+	DEBUG_FUNC(
+		msgpack_object_print(stdout, *obj);
+		puts("");
+	);
 	msgpack_object_array arr = obj->via.array;
 
 	assert(arr.size == DPX_PACK_ARRAY_SIZE);

@@ -37,9 +37,6 @@ main(int argc, char* argv[])
 
 	int i;
 	for (i=0; i<num_msgs; i++) {
-		if (i == num_msgs - 1)
-			frame->last = 1;
-
 		if (dpx_channel_send_frame(chan, frame) != DPX_ERROR_NONE) {
 			fprintf(stderr, "failed to send frame to local\n");
 			return 1;

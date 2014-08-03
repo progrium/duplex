@@ -64,7 +64,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 
 			qunlock(c->lock);
 			
-			printf("channel = %p, frame->channel = %d, frame->type = %d\n", channel, frame->channel, frame->type);
+			DEBUG_FUNC(printf("channel = %p, frame->channel = %d, frame->type = %d\n", channel, frame->channel, frame->type));
 			if (channel != NULL && frame->type == DPX_FRAME_DATA) {
 				if (_dpx_channel_handle_incoming(channel->value, frame))
 					continue;
@@ -75,7 +75,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 					continue;
 				}
 			}
-			printf("(%d) dropped frame, size %d", c->peer->index, frame->payloadSize);
+			fprintf(stderr, "(%d) dropped frame, size %d", c->peer->index, frame->payloadSize);
 			dpx_frame_free(frame);
 		}
 	}
@@ -96,17 +96,19 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 
 		if (result < 0) {
 			alchansendul(frame->errCh, DPX_ERROR_NETWORK_FAIL);
-			printf("Sending frame failed due to system error: %zu bytes\n", encoded->size);
+			fprintf(stderr, "Sending frame failed due to system error: %zu bytes\n", encoded->size);
 			return;
 		} else if (result != encoded->size) {
 			alchansendul(frame->errCh, DPX_ERROR_NETWORK_NOTALL);
-			printf("Sending frame failed because not all bytes were sent: %zu/%zu bytes\n", result, encoded->size);
+			fprintf(stderr, "Sending frame failed because not all bytes were sent: %zu/%zu bytes\n", result, encoded->size);
 			return;
 		} else {
 			alchansendul(frame->errCh, DPX_ERROR_NONE);
 		}
 	}
 
+	// FIXME never being hit
+	// cannot break above because read_frames will fail
 	close(c->connfd);
 }
 

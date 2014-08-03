@@ -14,7 +14,7 @@ struct _dpx_context {
 };
 
 // socket communication
-#define DPX_SOCK_LIMIT 1024
+#define DPX_SOCK_LIMIT 512
 
 dpx_context* c = NULL;
 
@@ -33,13 +33,9 @@ void* _dpx_joinfunc(_dpx_a *a) {
 
 	len = strlen(sa.sun_path) + sizeof(sa.sun_family);
 	while(connect(fd, (struct sockaddr*)&sa, len) == -1){
-        // this is annoying
-        //fprintf(stderr, "failed to connect, waiting 1 second to try again\n");
-		
-        // wait like... 0.05 seconds? that is 50000000 nanoseconds.
         struct timespec t;
         t.tv_sec = 0;
-        t.tv_nsec = 50000000;
+        t.tv_nsec = 5000;
         nanosleep(&t, NULL);
 	}
 
@@ -85,7 +81,7 @@ void _dpx_libtask_handler(void* v) {
 		abort(); // FIXME ?
 	}
 
-	shutdown(remotesd, SHUT_WR); // on client side, have to close().
+	close(remotesd);
 }
 
 // +thread libtask
@@ -101,9 +97,9 @@ void _dpx_libtask_checker(void* v) {
 		int remotesd;
 
 		if ((remotesd = sockaccept(c->task_sock)) == -1) {
-            perror("failed to accept request: ");
-            taskdelay(50);
-            continue;
+			perror("failed to accept request, yielding: ");
+			taskdelay(0); // because taskyield does NOTHING
+			continue;
 		}
 
 		int* store = malloc(sizeof(int));
@@ -164,7 +160,7 @@ void dpx_init() {
 	int flags = fcntl(task_sock, F_GETFL, 0);
 	fcntl(task_sock, F_SETFL, flags | O_NONBLOCK);
 
-	printf("dpx_init: sock @ %s\n", name);
+	DEBUG_FUNC(printf("dpx_init: sock @ %s\n", name));
 
 	c = calloc(1, sizeof(dpx_context));
 	c->task_sock = task_sock;
@@ -180,7 +176,7 @@ void dpx_cleanup() {
 		abort();
 	}
 
-	printf("dpx_cleanup: sock @ %s\n", c->name);
+	DEBUG_FUNC(printf("dpx_cleanup: sock @ %s\n", c->name));
 	unlink(c->name);
 	pthread_cancel(c->task_thread);
 	close(c->task_sock);
