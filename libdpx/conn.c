@@ -53,6 +53,9 @@ void _dpx_duplex_conn_read_frames(void *v) {
 		while (msgpack_unpacker_next(&unpacker, &result)) {
 			// result is here!
 			msgpack_object obj = result.data;
+ 
+			// make sure it's an array
+			assert (obj.type == MSGPACK_OBJECT_ARRAY);
 
 			dpx_frame* frame = _dpx_frame_msgpack_from(&obj);
 
@@ -96,31 +99,42 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 		msgpack_sbuffer* encoded = _dpx_frame_msgpack_to(frame);
 		ssize_t result = fdwrite(c->connfd, encoded->data, encoded->size);
 
-
 		if (result < 0) {
 			alchansendul(frame->errCh, DPX_ERROR_NETWORK_FAIL);
-			fprintf(stderr, "Sending frame failed due to system error: %zu bytes\n", encoded->size);
-			return;
+			fprintf(stderr, "(%d) Sending frame failed due to system error: %zu bytes\n", c->peer->index, encoded->size);
 		} else if (result != encoded->size) {
 			alchansendul(frame->errCh, DPX_ERROR_NETWORK_NOTALL);
-			fprintf(stderr, "Sending frame failed because not all bytes were sent: %zu/%zu bytes\n", result, encoded->size);
-			return;
+			fprintf(stderr, "(%d) Sending frame failed because not all bytes were sent: %zu/%zu bytes\n", c->peer->index, result, encoded->size);
 		} else {
 			alchansendul(frame->errCh, DPX_ERROR_NONE);
 		}
+
 		msgpack_sbuffer_free(encoded);
 	}
 
-	// FIXME never being hit
+	// FIXME FIXME FIXME FIXME FIXME
 	// cannot break above because read_frames will fail
 	close(c->connfd);
 }
 
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
-	//printf("conn: %p, frame: %p\n", c, frame);
-	if (alchansend(c->writeCh, &frame) == ALCHAN_CLOSED)
-		return DPX_ERROR_DUPLEX_CLOSED;
-	return alchanrecvul(frame->errCh);
+	frame->errCh = alchancreate(sizeof(DPX_ERROR), 0);
+
+	DPX_ERROR result = DPX_ERROR_NONE;
+
+	if (alchansend(c->writeCh, &frame) == ALCHAN_CLOSED) {
+		result = DPX_ERROR_DUPLEX_CLOSED;
+		goto _dpx_duplex_conn_write_frame_cleanup;
+	}
+
+	result = alchanrecvul(frame->errCh);
+
+_dpx_duplex_conn_write_frame_cleanup:
+	alchanclose(frame->errCh);
+	//alchanfree(frame->errCh);
+	//frame->errCh = NULL;
+
+	return result;
 }
 
 void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch) {
