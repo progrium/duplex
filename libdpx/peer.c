@@ -276,9 +276,10 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 			int index = _dpx_peer_next_conn(p, &conn);
 			DEBUG_FUNC(printf("(%d) Sending OPEN frame [%d]: %d bytes\n", p->index, index, frame->payloadSize));
 			err = _dpx_duplex_conn_write_frame(conn, frame);
-			if (err == DPX_ERROR_NONE)
+			if (err == DPX_ERROR_NONE) {
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
-			dpx_frame_free(frame);
+			    dpx_frame_free(frame);
+            }
 		}
 	}
 }
@@ -294,7 +295,7 @@ dpx_channel* _dpx_peer_open(dpx_peer *p, char *method) {
 	dpx_frame* frame = dpx_frame_new(ret);
 
 	frame->type = DPX_FRAME_OPEN;
-	frame->method = malloc(strlen(method + 1));
+	frame->method = malloc(strlen(method) + 1);
 	strcpy(frame->method, method);
 
 	alchansend(p->openFrames, &frame);

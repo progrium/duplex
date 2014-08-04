@@ -158,7 +158,10 @@ void dpx_init() {
 	}
 
 	int flags = fcntl(task_sock, F_GETFL, 0);
-	fcntl(task_sock, F_SETFL, flags | O_NONBLOCK);
+	if (fcntl(task_sock, F_SETFL, flags | O_NONBLOCK) == -1) {
+        fprintf(stderr, "faied to open task socket");
+        abort();
+    }
 
 	DEBUG_FUNC(printf("dpx_init: sock @ %s\n", name));
 

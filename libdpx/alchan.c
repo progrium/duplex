@@ -31,8 +31,8 @@ al_channel*
 alchancreate(size_t elemsize, unsigned int buffersize)
 {
 	al_channel* chan = calloc(1, sizeof(al_channel));
-    chan->rcond = calloc(1, sizeof(Rendez*));
-    chan->wcond = calloc(1, sizeof(Rendez*));
+    chan->rcond = calloc(1, sizeof(Rendez));
+    chan->wcond = calloc(1, sizeof(Rendez));
 
 	chan->elemsize = elemsize;
 	chan->bufsize = buffersize;
