@@ -151,7 +151,7 @@ dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 		strncpy(valBuf, rawValue.ptr, rawValue.size);
 		*(valBuf+rawValue.size) = '\0';
 		header->value = valBuf;
-		
+
 		HASH_ADD_KEYPTR(hh, frame->headers, header->key, strlen(header->key), header);
 		headers++;
 	}
@@ -170,7 +170,7 @@ dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 	frame->payload = payloadBuf;
 
 	frame->payloadSize = payloadRaw.size;
-	
+
 	return frame;
 }
 

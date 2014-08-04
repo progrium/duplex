@@ -11,10 +11,9 @@ struct _al_ch_list {
 	_al_ch_list		*next;
 };
 
-struct al_channel
-{
-    Rendez          *rcond;
-    Rendez          *wcond;
+struct al_channel {
+	Rendez          *rcond;
+	Rendez          *wcond;
 
 	int				closed;
 
@@ -28,11 +27,10 @@ struct al_channel
 };
 
 al_channel*
-alchancreate(size_t elemsize, unsigned int buffersize)
-{
+alchancreate(size_t elemsize, unsigned int buffersize) {
 	al_channel* chan = calloc(1, sizeof(al_channel));
-    chan->rcond = calloc(1, sizeof(Rendez));
-    chan->wcond = calloc(1, sizeof(Rendez));
+	chan->rcond = calloc(1, sizeof(Rendez));
+	chan->wcond = calloc(1, sizeof(Rendez));
 
 	chan->elemsize = elemsize;
 	chan->bufsize = buffersize;
@@ -41,17 +39,15 @@ alchancreate(size_t elemsize, unsigned int buffersize)
 }
 
 void
-alchanclose(al_channel *c)
-{
+alchanclose(al_channel *c) {
 	c->closed = 1;
-    taskwakeupall(c->rcond);
-    taskwakeupall(c->wcond);
+	taskwakeupall(c->rcond);
+	taskwakeupall(c->wcond);
 	// ^ anything waiting on a channel must now realise it's closed
 }
 
 int
-alchanfree(al_channel *c)
-{
+alchanfree(al_channel *c) {
 	if (!c->closed)
 		return 0;
 	if (c->head != NULL)
@@ -64,8 +60,7 @@ alchanfree(al_channel *c)
 }
 
 int
-alchannbrecv(al_channel *c, void *v)
-{
+alchannbrecv(al_channel *c, void *v) {
 	if (c->head == NULL) {
 		if (c->closed)
 			return ALCHAN_CLOSED;
@@ -96,26 +91,22 @@ alchannbrecv(al_channel *c, void *v)
 }
 
 void*
-alchannbrecvp(al_channel *c)
-{
+alchannbrecvp(al_channel *c) {
 	void* pointer = NULL;
 	alchannbrecv(c, &pointer);
 	return pointer;
 }
 
 unsigned long
-alchannbrecvul(al_channel *c)
-{
+alchannbrecvul(al_channel *c) {
 	unsigned long value;
 	alchannbrecv(c, &value);
 	return value;
 }
 
 int
-alchanrecv(al_channel *c, void *v)
-{
-	while (1)
-	{
+alchanrecv(al_channel *c, void *v) {
+	while (1) {
 		int result = alchannbrecv(c, v);
 		if (result != ALCHAN_NONE)
 			return result;
@@ -125,33 +116,29 @@ alchanrecv(al_channel *c, void *v)
 }
 
 void*
-alchanrecvp(al_channel *c)
-{
+alchanrecvp(al_channel *c) {
 	void* pointer = NULL;
 	alchanrecv(c, &pointer);
 	return pointer;
 }
 
 unsigned long
-alchanrecvul(al_channel *c)
-{
+alchanrecvul(al_channel *c) {
 	unsigned long value;
 	alchannbrecv(c, &value);
 	return value;
 }
 
 int
-_alchansend(al_channel *c, void *v, int block)
-{
+_alchansend(al_channel *c, void *v, int block) {
 	if (c->closed)
 		return ALCHAN_CLOSED;
 
 	// special condition for 0
-	// if the buffer size is 0 (synchronous), then we will go over the 
+	// if the buffer size is 0 (synchronous), then we will go over the
 	// the buffer limit regardless... (and block later until chan receieves it)
 
-	while (1)
-	{
+	while (1) {
 		int cond = (c->cursize >= c->bufsize);
 		if (c->bufsize == 0)
 			cond = (c->cursize > c->bufsize);
@@ -192,10 +179,8 @@ _alchansend(al_channel *c, void *v, int block)
 
 	// if buffer is overfull and we're blocking, block
 	// (special condition for 0: block always)
-	if (block || c->bufsize == 0)
-	{
-		while (c->cursize > c->bufsize)
-		{
+	if (block || c->bufsize == 0) {
+		while (c->cursize > c->bufsize) {
 			tasksleep(c->wcond);
 		}
 	}
@@ -204,37 +189,31 @@ _alchansend(al_channel *c, void *v, int block)
 }
 
 int
-alchannbsend(al_channel *c, void *v)
-{
+alchannbsend(al_channel *c, void *v) {
 	return _alchansend(c, v, 0);
 }
 
 int
-alchannbsendp(al_channel *c, void *v)
-{
+alchannbsendp(al_channel *c, void *v) {
 	return alchannbsendp(c, &v);
 }
 
 int
-alchannbsendul(al_channel *c, unsigned long v)
-{
+alchannbsendul(al_channel *c, unsigned long v) {
 	return alchannbsend(c, &v);
 }
 
 int
-alchansend(al_channel *c, void *v)
-{
+alchansend(al_channel *c, void *v) {
 	return _alchansend(c, v, 1);
 }
 
 int
-alchansendp(al_channel *c, void *v)
-{
+alchansendp(al_channel *c, void *v) {
 	return alchansendp(c, &v);
 }
 
 int
-alchansendul(al_channel *c, unsigned long v)
-{
+alchansendul(al_channel *c, unsigned long v) {
 	return alchansend(c, &v);
 }

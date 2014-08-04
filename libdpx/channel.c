@@ -182,7 +182,7 @@ dpx_channel* _dpx_channel_new_client(dpx_peer *p, char* method) {
 
 dpx_channel* _dpx_channel_new_server(dpx_duplex_conn *conn, dpx_frame *frame) {
 	dpx_channel* ptr = _dpx_channel_new();
-	
+
 	ptr->server = 1;
 	ptr->peer = conn->peer;
 
@@ -338,7 +338,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 
 					if (alchanrecv(c->connCh, &c->conn) == ALCHAN_CLOSED)
 						goto _dpx_channel_pump_outgoing_cleanup;
-					
+
 					continue;
 				}
 				if (frame->error != NULL && strcmp(frame->error, "")) {

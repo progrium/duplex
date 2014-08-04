@@ -53,7 +53,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 		while (msgpack_unpacker_next(&unpacker, &result)) {
 			// result is here!
 			msgpack_object obj = result.data;
- 
+
 			// make sure it's an array
 			assert (obj.type == MSGPACK_OBJECT_ARRAY);
 
@@ -66,7 +66,7 @@ void _dpx_duplex_conn_read_frames(void *v) {
 			HASH_FIND_INT(c->channels, &frame->channel, channel);
 
 			qunlock(c->lock);
-			
+
 			DEBUG_FUNC(printf("channel = %p, frame->channel = %d, frame->type = %d\n", channel, frame->channel, frame->type));
 			if (channel != NULL && frame->type == DPX_FRAME_DATA) {
 				if (_dpx_channel_handle_incoming(channel->value, frame))
@@ -156,9 +156,9 @@ void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 	qlock(c->lock);
 	dpx_channel_map *m;
 
-    HASH_FIND_INT(c->channels, &ch->id, m);
+	HASH_FIND_INT(c->channels, &ch->id, m);
 
-    if (m != NULL)
+	if (m != NULL)
 		HASH_DEL(c->channels, m);
 
 	qunlock(c->lock);

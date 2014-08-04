@@ -17,13 +17,13 @@
 #define TCP 1
 
 #if defined(DEBUG) | defined(_DEBUG)
-	#ifndef DEBUG_FUNC
-		#define DEBUG_FUNC(...) do { __VA_ARGS__; } while(0)
-	#endif
+#ifndef DEBUG_FUNC
+#define DEBUG_FUNC(...) do { __VA_ARGS__; } while(0)
+#endif
 #else
-	#ifndef DEBUG_FUNC
-		#define DEBUG_FUNC(...)
-	#endif
+#ifndef DEBUG_FUNC
+#define DEBUG_FUNC(...)
+#endif
 #endif
 
 // -------------------------------- { errors } --------------------------------
@@ -76,7 +76,7 @@ typedef struct _dpx_peer_connection dpx_peer_connection;
 
 struct _dpx_peer {
 	QLock *lock;
-	
+
 	dpx_peer_listener *listeners; // listener fds
 	dpx_peer_connection *conns;
 	al_channel* openFrames;

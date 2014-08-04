@@ -23,20 +23,20 @@ void* _dpx_joinfunc(_dpx_a *a) {
 	int fd, len;
 	struct sockaddr_un sa;
 
-	if((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0){
+	if((fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		return NULL;
 	}
-	
+
 	memset(&sa, 0, sizeof(sa));
 	sa.sun_family = AF_UNIX;
 	strcpy(sa.sun_path, c->name);
 
 	len = strlen(sa.sun_path) + sizeof(sa.sun_family);
-	while(connect(fd, (struct sockaddr*)&sa, len) == -1){
-        struct timespec t;
-        t.tv_sec = 0;
-        t.tv_nsec = 5000;
-        nanosleep(&t, NULL);
+	while(connect(fd, (struct sockaddr*)&sa, len) == -1) {
+		struct timespec t;
+		t.tv_sec = 0;
+		t.tv_nsec = 5000;
+		nanosleep(&t, NULL);
 	}
 
 	if (write(fd, &a, sizeof(void*)) != sizeof(void*)) {
@@ -87,7 +87,7 @@ void _dpx_libtask_handler(void* v) {
 // +thread libtask
 void _dpx_libtask_checker(void* v) {
 	taskname("dpx_libtask_checker");
-	
+
 	if (listen(c->task_sock, DPX_SOCK_LIMIT) == -1) {
 		fprintf(stderr, "failed to listen");
 		abort();
@@ -159,9 +159,9 @@ void dpx_init() {
 
 	int flags = fcntl(task_sock, F_GETFL, 0);
 	if (fcntl(task_sock, F_SETFL, flags | O_NONBLOCK) == -1) {
-        fprintf(stderr, "faied to open task socket");
-        abort();
-    }
+		fprintf(stderr, "faied to open task socket");
+		abort();
+	}
 
 	DEBUG_FUNC(printf("dpx_init: sock @ %s\n", name));
 

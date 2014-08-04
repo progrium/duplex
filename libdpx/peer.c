@@ -66,7 +66,7 @@ dpx_channel* dpx_peer_accept(dpx_peer *p) {
 	a.args = p;
 
 	void* ret = _dpx_joinfunc(&a);
-	
+
 	return (dpx_channel*)ret;
 }
 
@@ -91,7 +91,7 @@ DPX_ERROR dpx_peer_close(dpx_peer *p) {
 	a.args = &h;
 
 	_dpx_joinfunc(&a);
-	
+
 	return h.err;
 }
 
@@ -120,7 +120,7 @@ DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port) {
 	a.args = &h;
 
 	_dpx_joinfunc(&a);
-	
+
 	return h.err;
 }
 
@@ -142,7 +142,7 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 	a.args = &h;
 
 	_dpx_joinfunc(&a);
-	
+
 	return h.err;
 }
 
@@ -278,8 +278,8 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 			err = _dpx_duplex_conn_write_frame(conn, frame);
 			if (err == DPX_ERROR_NONE) {
 				_dpx_duplex_conn_link_channel(conn, frame->chanRef);
-			    dpx_frame_free(frame);
-            }
+				dpx_frame_free(frame);
+			}
 		}
 	}
 }
@@ -325,7 +325,7 @@ _dpx_peer_handle_open_cleanup:
 dpx_channel* _dpx_peer_accept(dpx_peer *p) {
 	if (p->incomingChannels == NULL)
 		return NULL;
-	
+
 	dpx_channel* chan;
 	if (alchanrecv(p->incomingChannels, &chan) == ALCHAN_CLOSED)
 		return NULL;
@@ -459,7 +459,7 @@ void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
 		if (fd < 0) {
 			if (p->closed)
 				break;
-			
+
 			fprintf(stderr, "failed to receive connection... ");
 
 			if (!again) {
