@@ -203,6 +203,9 @@ START_TEST(test_dpx_rpc_call) {
 
 	dpx_peer_close(client);
 
+	dpx_peer_free(server);
+	dpx_peer_free(client);
+
 	dpx_cleanup();
 
 } END_TEST

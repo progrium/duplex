@@ -71,11 +71,13 @@ void _dpx_duplex_conn_read_frames(void *v) {
 			}
 			if (channel == NULL && frame->type == DPX_FRAME_OPEN) {
 				if (_dpx_peer_handle_open(c->peer, c, frame)) {
+					free(frame->payload);
 					dpx_frame_free(frame);
 					continue;
 				}
 			}
 			fprintf(stderr, "(%d) dropped frame, size %d", c->peer->index, frame->payloadSize);
+			free(frame->payload);
 			dpx_frame_free(frame);
 		}
 	}
@@ -94,6 +96,8 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 		msgpack_sbuffer* encoded = _dpx_frame_msgpack_to(frame);
 		ssize_t result = fdwrite(c->connfd, encoded->data, encoded->size);
 
+		msgpack_sbuffer_free(encoded);
+
 		if (result < 0) {
 			alchansendul(frame->errCh, DPX_ERROR_NETWORK_FAIL);
 			fprintf(stderr, "Sending frame failed due to system error: %zu bytes\n", encoded->size);
@@ -104,7 +108,7 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 			return;
 		} else {
 			alchansendul(frame->errCh, DPX_ERROR_NONE);
-		}
+		}		
 	}
 
 	// FIXME never being hit
