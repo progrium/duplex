@@ -1,8 +1,6 @@
-# Duplex 
+# Duplex [![Coverity Scan Build Status](https://scan.coverity.com/projects/2512/badge.svg)](https://scan.coverity.com/projects/2512)
 
 Duplex is a simple, efficient, extensible application communications protocol and library. It's heavily inspired by ZeroMQ and BERT-RPC, but draws influence from Twitter Finagle, HTTP/2, zerorpc, and Unix pipes.
-
-Currently for #golang, the core (dpx) is intended to be rewritten in C using libtask to make it available to most other languages. 
 
 ## Features
 
@@ -24,13 +22,50 @@ Although heavily inpsired by ZeroMQ and nanomsg, here are reasons it doesn't use
 
 In short, the messaging abstractions work against the goals of Duplex. However there are many great features that Duplex emulates, mostly to employ the overall distributed / edge messaging philosophy, and building in connection pools, reconnect logic, edge queuing, and optimizing for high-throughput async usage.
 
-## Roadmap
+## Implementations
 
- * Prototype in Go
- * Validate by using in Flynn components
- * Document protocols
- * Port to C (using the Go-like libtask)
- * Write bindings and popularize!
+The low level library is called `libdpx`. The high level library (niceties around your language, except if you're using C) is called `duplex`.
+
+### Reference Implementation (prototype)
+
+Prototyped in Go. It is currently usable. Simply `go get -u github.com/robxu9/duplex/prototype`.
+
+### Core C Implementation (libdpx)
+
+Seems to work (tm).
+
+The basic workflow for using `dpx-c` is the following:
+
+* Initialise a worker context, so that all operations happen on the worker thread: `dpx_context *c = dpx_init();`
+* Initialise a peer that will utilise that context: `dpx_peer *p = dpx_peer_new(c);`
+* Use happily and/or report lots of bugs.
+
+#### Requirements:
+
+* [libtask](https://github.com/robxu9/duplex/tree/master/vendor/libtask)
+* [msgpack-c](https://github.com/msgpack/msgpack-c)
+* For testing: [check](http://check.sourceforge.net)
+
+Compile with `make`, test with `make check`, install with `make install`.
+(Don't forget to run `ldconfig`; I make that mistake way too often.)
+
+#### Troubles:
+
+* bindings may not cleanup the socket left in `/tmp/dpxc_*`. Not really troublesome, but it can pile up.
+
+### Bindings around libdpx (bindings)
+
+#### go-duplex (high level api for golang)
+
+Uses `go-dpx` to JSON encode objects for sending over to other applications. You must have `libdpx` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex`.
+
+#### go-dpx (low level api for golang)
+
+Interacts directly with `libdpx`. You must have `libdpx` installed on your system prior to running `go get -u github.com/robxu9/duplex/bindings/go-duplex/dpx`.
+
+#### pydpx (low level api for python2)
+
+Via `ctypes`. Seems to work well. You must have `libdpx` installed on your system prior to running `python setup.py install`.
 
 ## How it works
 
@@ -79,6 +114,10 @@ Because Duplex peers are symmetrical, there is no technical distinction of clien
 Like ZeroMQ devices, Duplex provides tools to let you build middleman "proxy" services. Using the metadata of headers, similar to HTTP proxies, you can customize routing and add features like authentication or rate limiting, without touching the RPC payloads. This is somewhat similar to Filters in Twitter Finagle.
 
 One "trick" we've been thinking about in tandem with our service discovery system, is allowing a middleman service to insert itself into the path of RPC connections via service discovery hooks. This would allow you to transparently insert and remove RPC proxy services to log traffic, add tracing, split requests, etc. 
+
+## Thanks to
+
+[Jeff Lindsay](https://github.com/progrium), my awesome mentor at DigitalOcean.
 
 ## License
 
