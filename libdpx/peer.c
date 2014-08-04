@@ -457,6 +457,9 @@ void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
 		int port;
 		int fd = netaccept(connfd, server, &port);
 		if (fd < 0) {
+			if (p->closed)
+				break;
+			
 			fprintf(stderr, "failed to receive connection... ");
 
 			if (!again) {
