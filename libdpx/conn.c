@@ -96,7 +96,6 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 		msgpack_sbuffer* encoded = _dpx_frame_msgpack_to(frame);
 		ssize_t result = fdwrite(c->connfd, encoded->data, encoded->size);
 
-		msgpack_sbuffer_free(encoded);
 
 		if (result < 0) {
 			alchansendul(frame->errCh, DPX_ERROR_NETWORK_FAIL);
@@ -108,7 +107,8 @@ void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c) {
 			return;
 		} else {
 			alchansendul(frame->errCh, DPX_ERROR_NONE);
-		}		
+		}
+		msgpack_sbuffer_free(encoded);
 	}
 
 	// FIXME never being hit
