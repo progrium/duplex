@@ -1,4 +1,5 @@
 #include "dpx-internal.h"
+#include <errno.h>
 
 QLock *index_mut = NULL;
 int _dpx_peer_index = 0;
@@ -343,6 +344,8 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 	p->closed = 1;
 
+	alchanclose(p->firstConn);
+
 	alchanclose(p->openFrames);
 
 	alchanclose(p->incomingChannels);
@@ -355,9 +358,8 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 _dpx_peer_close_cleanup:
 	qunlock(p->lock);
-	taskdelay(0); // needed to make sure other coroutines cleanup
-	// [thankfully this is only a read not a write]
-	// [from valgrind: because of p->closed at _dpx_peer_bind_task]
+	// FIXME figure out how to make sure bind task dies
+	taskdelay(0);
 	return ret;
 }
 
@@ -460,6 +462,11 @@ void _dpx_peer_bind_task(struct _dpx_peer_bind_task_param *param) {
 		int port;
 		int fd = netaccept(connfd, server, &port);
 		if (fd < 0) {
+			// closed when free'ing
+			if (errno == EBADF)
+				break;
+
+			// FIXME p may be free'd
 			if (p->closed)
 				break;
 
