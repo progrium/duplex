@@ -12,8 +12,10 @@ struct _al_ch_list {
 };
 
 struct al_channel {
-	Rendez          *rcond;
-	Rendez          *wcond;
+	QLock			lock;
+
+	Rendez          rcond;
+	Rendez          wcond;
 
 	int				closed;
 
@@ -29,8 +31,6 @@ struct al_channel {
 al_channel*
 alchancreate(size_t elemsize, unsigned int buffersize) {
 	al_channel* chan = calloc(1, sizeof(al_channel));
-	chan->rcond = calloc(1, sizeof(Rendez));
-	chan->wcond = calloc(1, sizeof(Rendez));
 
 	chan->elemsize = elemsize;
 	chan->bufsize = buffersize;
@@ -40,10 +40,14 @@ alchancreate(size_t elemsize, unsigned int buffersize) {
 
 void
 alchanclose(al_channel *c) {
+	qlock(&c->lock);
+
 	c->closed = 1;
-	taskwakeupall(c->rcond);
-	taskwakeupall(c->wcond);
+	taskwakeupall(&c->rcond);
+	taskwakeupall(&c->wcond);
 	// ^ anything waiting on a channel must now realise it's closed
+
+	qunlock(&c->lock);
 }
 
 int
@@ -52,8 +56,6 @@ alchanfree(al_channel *c) {
 		return 0;
 	if (c->head != NULL)
 		return 0;
-	free(c->rcond);
-	free(c->wcond);
 	free(c);
 
 	return 1;
@@ -61,11 +63,17 @@ alchanfree(al_channel *c) {
 
 int
 alchannbrecv(al_channel *c, void *v) {
+	int ret = 0;
+
+	qlock(&c->lock);
+
 	if (c->head == NULL) {
 		if (c->closed)
-			return ALCHAN_CLOSED;
+			ret = ALCHAN_CLOSED;
 		else
-			return ALCHAN_NONE;
+			ret = ALCHAN_NONE;
+
+		goto _alchannbrecv_cleanup;
 	}
 
 	_al_ch_list *head = c->head;
@@ -85,9 +93,12 @@ alchannbrecv(al_channel *c, void *v) {
 	free(head);
 
 	// signal to wcond that we just freed an element
-	taskwakeupall(c->wcond);
+	taskwakeupall(&c->wcond);
 
-	return 0;
+_alchannbrecv_cleanup:
+	qunlock(&c->lock);
+
+	return ret;
 }
 
 void*
@@ -114,7 +125,7 @@ alchanrecv(al_channel *c, void *v) {
 		if (result != ALCHAN_NONE)
 			return result;
 
-		tasksleep(c->rcond);
+		tasksleep(&c->rcond);
 	}
 }
 
@@ -141,9 +152,15 @@ _alchansend(al_channel *c, void *v, int block) {
 	// if the buffer size is 0 (synchronous), then we will go over the
 	// the buffer limit regardless... (and block later until chan receieves it)
 
+	int ret = 0;
+
+	qlock(&c->lock);
+
 	while (1) {
-		if (c->closed)
-			return ALCHAN_CLOSED;
+		if (c->closed) {
+			ret = ALCHAN_CLOSED;
+			goto _alchansend_cleanup;
+		}
 
 		int cond = (c->cursize >= c->bufsize);
 		if (c->bufsize == 0)
@@ -154,9 +171,12 @@ _alchansend(al_channel *c, void *v, int block) {
 		}
 
 		if (block) {
-			tasksleep(c->wcond);
+			qunlock(&c->lock);
+			tasksleep(&c->wcond);
+			qlock(&c->lock);
 		} else {
-			return ALCHAN_FULL;
+			ret = ALCHAN_FULL;
+			goto _alchansend_cleanup;
 		}
 	}
 
@@ -177,17 +197,22 @@ _alchansend(al_channel *c, void *v, int block) {
 	c->cursize++;
 
 	// let readers know that we've just inserted an element
-	taskwakeupall(c->rcond);
+	taskwakeupall(&c->rcond);
 
 	// if buffer is overfull and we're blocking, block
 	// (special condition for 0: block always)
 	if (block || c->bufsize == 0) {
 		while (c->cursize > c->bufsize) {
-			tasksleep(c->wcond);
+			qunlock(&c->lock);
+			tasksleep(&c->wcond);
+			qlock(&c->lock);
 		}
 	}
 
-	return 0;
+_alchansend_cleanup:
+	qunlock(&c->lock);
+
+	return ret;
 }
 
 int
