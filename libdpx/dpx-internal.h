@@ -11,7 +11,7 @@
 #include <assert.h>
 
 // ------------------------------- { constants } ------------------------------
-#define DPX_TASK_STACK_SIZE 65536
+#define DPX_TASK_STACK_SIZE 32768
 
 #define UDP 0
 #define TCP 1

@@ -131,8 +131,8 @@ DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
 
 _dpx_duplex_conn_write_frame_cleanup:
 	alchanclose(frame->errCh);
-	//alchanfree(frame->errCh);
-	//frame->errCh = NULL;
+	assert(alchanfree(frame->errCh));
+	frame->errCh = NULL;
 
 	return result;
 }

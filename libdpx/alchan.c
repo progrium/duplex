@@ -100,7 +100,7 @@ alchannbrecvp(al_channel *c) {
 unsigned long
 alchannbrecvul(al_channel *c) {
 	unsigned long *value;
-	if (alchanrecv(c, &value))
+	if (alchannbrecv(c, &value))
 		return 0;
 	unsigned long ret = *value;
 	free(value);
@@ -137,14 +137,14 @@ alchanrecvul(al_channel *c) {
 
 int
 _alchansend(al_channel *c, void *v, int block) {
-	if (c->closed)
-		return ALCHAN_CLOSED;
-
 	// special condition for 0
 	// if the buffer size is 0 (synchronous), then we will go over the
 	// the buffer limit regardless... (and block later until chan receieves it)
 
 	while (1) {
+		if (c->closed)
+			return ALCHAN_CLOSED;
+
 		int cond = (c->cursize >= c->bufsize);
 		if (c->bufsize == 0)
 			cond = (c->cursize > c->bufsize);
@@ -159,10 +159,6 @@ _alchansend(al_channel *c, void *v, int block) {
 			return ALCHAN_FULL;
 		}
 	}
-
-	// check again in case we close the channel
-	if (c->closed)
-		return ALCHAN_CLOSED;
 
 	_al_ch_list *elem = malloc(sizeof(_al_ch_list));
 	elem->prev = c->tail;

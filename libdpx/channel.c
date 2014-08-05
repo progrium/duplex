@@ -322,7 +322,9 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 
 		dpx_duplex_conn *conn;
 		int hasConn = alchannbrecv(c->connCh, &conn);
-		if (hasConn != ALCHAN_NONE)
+		if (hasConn == ALCHAN_CLOSED)
+			goto _dpx_channel_pump_outgoing_cleanup;
+		else if (hasConn != ALCHAN_NONE)
 			c->conn = conn;
 
 		dpx_frame *frame;

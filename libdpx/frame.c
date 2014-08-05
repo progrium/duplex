@@ -1,12 +1,15 @@
 #include "dpx-internal.h"
 
 void dpx_frame_free(dpx_frame *frame) {
-	alchanclose(frame->errCh);
-	// empty channel
-	DPX_ERROR err;
-	while (alchanrecv(frame->errCh, &err) != ALCHAN_CLOSED) {}
+	if (frame->errCh != NULL) {
+		alchanclose(frame->errCh);
+		// empty channel
+		DPX_ERROR err;
+		while (alchanrecv(frame->errCh, &err) != ALCHAN_CLOSED) {}
 
-	alchanfree(frame->errCh);
+		alchanfree(frame->errCh);
+	}
+	
 	if (frame->method != NULL)
 		free(frame->method);
 	if (frame->error != NULL)

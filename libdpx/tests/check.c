@@ -466,22 +466,22 @@ dpx_suite_core(void)
 {
 	Suite *s = suite_create("DPX-C Core");
 
-	TCase *tc_core = tcase_create("Basic Functions");
-	tcase_add_test(tc_core, test_dpx_init);
-	tcase_add_test(tc_core, test_dpx_thread_communication);
-	tcase_add_test(tc_core, test_alchan);
+	// TCase *tc_core = tcase_create("Basic Functions");
+	// tcase_add_test(tc_core, test_dpx_init);
+	// tcase_add_test(tc_core, test_dpx_thread_communication);
+	// tcase_add_test(tc_core, test_alchan);
 
-	suite_add_tcase(s, tc_core);
+	// suite_add_tcase(s, tc_core);
 
-	TCase *tc_peer = tcase_create("Peer Functions");
-	tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
-	tcase_add_test(tc_peer, test_dpx_rpc_call);
+	// TCase *tc_peer = tcase_create("Peer Functions");
+	// tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
+	// tcase_add_test(tc_peer, test_dpx_rpc_call);
 
-	suite_add_tcase(s, tc_peer);
+	// suite_add_tcase(s, tc_peer);
 
 	TCase *tc_async = tcase_create("Async Functions");
 	tcase_add_test(tc_async, test_dpx_round_robin_async);
-	tcase_add_test(tc_async, test_dpx_async_messaging);
+	// tcase_add_test(tc_async, test_dpx_async_messaging);
 	tcase_set_timeout(tc_async, 10);
 
 	suite_add_tcase(s, tc_async);
