@@ -131,6 +131,9 @@ DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame) {
 
 _dpx_duplex_conn_write_frame_cleanup:
 	alchanclose(frame->errCh);
+	// yield so that consumers can cleanup
+	// otherwise they'll access after free'd and therefore mem corruption
+	taskdelay(0);
 	assert(alchanfree(frame->errCh));
 	frame->errCh = NULL;
 
