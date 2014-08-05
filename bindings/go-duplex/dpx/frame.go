@@ -11,7 +11,6 @@ const (
 )
 
 type Frame struct {
-	Method  string
 	Headers map[string]string
 	Error   string
 	Last    bool
@@ -24,10 +23,6 @@ func fromCFrame(frame *C.dpx_frame) *Frame {
 		Headers: make(map[string]string),
 		Last:    (frame.last != 0),
 		Payload: C.GoBytes(unsafe.Pointer(frame.payload), frame.payloadSize),
-	}
-
-	if frame.method != nil {
-		f.Method = C.GoString(frame.method)
 	}
 
 	if frame.error != nil {
@@ -48,7 +43,6 @@ func helperAdd(p *unsafe.Pointer, k *C.char, v *C.char) {
 
 func toCFrame(frame *Frame) *C.dpx_frame {
 	cframe := C.dpx_frame_new(nil)
-	cframe.method = C.CString(frame.Method)
 	cframe.headers = nil
 	cframe.error = C.CString(frame.Error)
 	if frame.Last {
