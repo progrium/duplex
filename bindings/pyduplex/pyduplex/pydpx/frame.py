@@ -20,8 +20,7 @@ class Frame(object):
         self.headers = {}
         self.last = False
         self.payload = bytearray([])
-        self.method = ''
-        self.error = ''
+        self.error = None
 
     @classmethod
     def from_c(cls, frame):
@@ -40,9 +39,6 @@ class Frame(object):
             payload.append(aframe.payload[i])
 
         self.payload = bytearray(payload)
-
-        if aframe.method is not None:
-            self.method = aframe.method
 
         if aframe.error is not None:
             self.error = aframe.error
@@ -69,7 +65,6 @@ class Frame(object):
 
         cframe = cframeptr[0]
 
-        cframe.method = self.method
         cframe.error = self.error
         cframe.headers = None
 
