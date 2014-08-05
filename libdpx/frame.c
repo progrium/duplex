@@ -129,11 +129,16 @@ dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 
 	frame->channel = o[1].via.i64;
 
-	msgpack_object_raw methodRaw = o[2].via.raw;
-	char* methodBuf = (char*) malloc(methodRaw.size+1);
-	strncpy(methodBuf, methodRaw.ptr, methodRaw.size);
-	*(methodBuf + methodRaw.size) = '\0';
-	frame->method = methodBuf;
+	msgpack_object methodObj = o[2];
+	if (methodObj.type == MSGPACK_OBJECT_NIL) {
+		frame->method = NULL;
+	} else {
+		msgpack_object_raw methodRaw = methodObj.via.raw;
+		char* methodBuf = (char*) malloc(methodRaw.size+1);
+		strncpy(methodBuf, methodRaw.ptr, methodRaw.size);
+		*(methodBuf + methodRaw.size) = '\0';
+		frame->method = methodBuf;
+	}
 
 	msgpack_object_map headers_map = o[3].via.map;
 	msgpack_object_kv* headers = headers_map.ptr;
@@ -159,13 +164,22 @@ dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 		headers++;
 	}
 
-	msgpack_object_raw errorRaw = o[4].via.raw;
-	char* errorBuf = (char*) malloc(errorRaw.size+1);
-	strncpy(errorBuf, errorRaw.ptr, errorRaw.size);
-	*(errorBuf + errorRaw.size) = '\0';
-	frame->error = errorBuf;
+	msgpack_object errorObj = o[4];
 
-	frame->last = o[5].via.i64;
+	if (errorObj.type == MSGPACK_OBJECT_NIL) {
+		frame->error = NULL;
+	} else {
+		msgpack_object_raw errorRaw = errorObj.via.raw;
+		char* errorBuf = (char*) malloc(errorRaw.size+1);
+		strncpy(errorBuf, errorRaw.ptr, errorRaw.size);
+		*(errorBuf + errorRaw.size) = '\0';
+		frame->error = errorBuf;
+	}
+
+	if (o[5].via.boolean)
+		frame->last = 1;
+	else
+		frame->last = 0;
 
 	msgpack_object_raw payloadRaw = o[6].via.raw;
 	char* payloadBuf = (char*) malloc(payloadRaw.size);
@@ -189,8 +203,7 @@ msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame) {
 		msgpack_pack_raw(pack, strlen(frame->method));
 		msgpack_pack_raw_body(pack, frame->method, strlen(frame->method));
 	} else {
-		msgpack_pack_raw(pack, 0);
-		msgpack_pack_raw_body(pack, "", 0);
+		msgpack_pack_nil(pack);
 	}
 
 	msgpack_pack_map(pack, HASH_COUNT(frame->headers));
@@ -208,11 +221,13 @@ msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame) {
 		msgpack_pack_raw(pack, strlen(frame->error));
 		msgpack_pack_raw_body(pack, frame->error, strlen(frame->error));
 	} else {
-		msgpack_pack_raw(pack, 0);
-		msgpack_pack_raw_body(pack, "", 0);
+		msgpack_pack_nil(pack);
 	}
 
-	msgpack_pack_int(pack, frame->last);
+	if (frame->last)
+		msgpack_pack_true(pack);
+	else
+		msgpack_pack_false(pack);
 
 	msgpack_pack_raw(pack, frame->payloadSize);
 	msgpack_pack_raw_body(pack, frame->payload, frame->payloadSize);

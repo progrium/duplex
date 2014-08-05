@@ -294,7 +294,7 @@ int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
 		goto _dpx_channel_handle_incoming_cleanup;
 	}
 
-	if (!frame->last && strcmp(frame->error, "") != 0) {
+	if (!frame->last && frame->error != NULL && strcmp(frame->error, "") != 0) {
 		struct _dpx_channel_close_via_task_struct *s = malloc(sizeof(struct _dpx_channel_close_via_task_struct));
 		s->c = c;
 		s->err = DPX_ERROR_CHAN_FRAME;
