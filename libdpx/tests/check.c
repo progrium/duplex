@@ -38,6 +38,91 @@ START_TEST(test_dpx_thread_communication) {
 	dpx_cleanup();
 } END_TEST
 
+void* test_alchan_1(void* v) {
+	al_channel *test = v;
+
+	// test regular unsigned longs
+	unsigned long number = 1;
+
+	ck_assert_int_eq(alchansend(test, &number), 0);
+
+	unsigned long get_back;
+	ck_assert_int_eq(alchanrecv(test, &get_back), 0);
+
+	ck_assert_int_eq(number, get_back);
+
+	ck_assert_int_eq(alchannbrecv(test, NULL), ALCHAN_NONE);
+}
+
+void* test_alchan_2(void* v) {
+	al_channel *test = v;
+
+	// test pointers
+	unsigned long *number = malloc(sizeof(unsigned long));
+	*number = 1;
+
+	ck_assert_int_eq(alchansend(test, &number), 0);
+
+	unsigned long *get_back;
+	ck_assert_int_eq(alchanrecv(test, &get_back), 0);
+
+	ck_assert_int_eq(*number, *get_back);
+
+	// now try our specialised function
+
+	ck_assert_int_eq(alchansendp(test, number), 0);
+	unsigned long *get_same_back = alchanrecvp(test);
+
+	ck_assert_msg(get_same_back != NULL, "pointer received was NULL");
+
+	ck_assert_int_eq(*number, *get_same_back);
+
+	free(number);
+
+	ck_assert_int_eq(alchannbrecv(test, NULL), ALCHAN_NONE);
+}
+
+void* test_alchan_3(void* v) {
+	al_channel *test = v;
+
+	// test unsigned long specialized function
+	unsigned long number = 10;
+
+	ck_assert_int_eq(alchansendul(test, number), 0);
+	ck_assert_int_eq(alchanrecvul(test), number);
+
+	ck_assert_msg(alchannbrecv(test, NULL) == ALCHAN_NONE, "the channel should be empty!");
+
+	// test closing
+
+	alchanclose(test);
+
+	ck_assert_int_eq(alchanrecv(test, NULL), ALCHAN_CLOSED);
+	ck_assert_int_eq(alchansend(test, NULL), ALCHAN_CLOSED);
+}
+
+START_TEST(test_alchan) {
+	dpx_init();
+
+	al_channel *test = alchancreate(sizeof(unsigned long), 1);
+
+	_dpx_a a;
+	a.args = test;
+
+	a.function = &test_alchan_1;
+	_dpx_joinfunc(&a);
+
+	a.function = &test_alchan_2;
+	_dpx_joinfunc(&a);
+
+	a.function = &test_alchan_3;
+	_dpx_joinfunc(&a);
+
+	alchanfree(test);
+
+	dpx_cleanup();
+} END_TEST
+
 START_TEST(test_dpx_peer_frame_send_receive) {
 	dpx_init();
 
@@ -384,6 +469,7 @@ dpx_suite_core(void)
 	TCase *tc_core = tcase_create("Basic Functions");
 	tcase_add_test(tc_core, test_dpx_init);
 	tcase_add_test(tc_core, test_dpx_thread_communication);
+	tcase_add_test(tc_core, test_alchan);
 
 	suite_add_tcase(s, tc_core);
 

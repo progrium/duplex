@@ -99,9 +99,12 @@ alchannbrecvp(al_channel *c) {
 
 unsigned long
 alchannbrecvul(al_channel *c) {
-	unsigned long value;
-	alchannbrecv(c, &value);
-	return value;
+	unsigned long *value;
+	if (alchanrecv(c, &value))
+		return 0;
+	unsigned long ret = *value;
+	free(value);
+	return ret;
 }
 
 int
@@ -124,9 +127,12 @@ alchanrecvp(al_channel *c) {
 
 unsigned long
 alchanrecvul(al_channel *c) {
-	unsigned long value;
-	alchannbrecv(c, &value);
-	return value;
+	unsigned long *value;
+	if (alchanrecv(c, &value))
+		return 0;
+	unsigned long ret = *value;
+	free(value);
+	return ret;
 }
 
 int
@@ -195,12 +201,14 @@ alchannbsend(al_channel *c, void *v) {
 
 int
 alchannbsendp(al_channel *c, void *v) {
-	return alchannbsendp(c, &v);
+	return alchannbsend(c, &v);
 }
 
 int
 alchannbsendul(al_channel *c, unsigned long v) {
-	return alchannbsend(c, &v);
+	unsigned long *ptr = malloc(sizeof(unsigned long));
+	*ptr = v;
+	return alchannbsend(c, &ptr);
 }
 
 int
@@ -210,10 +218,12 @@ alchansend(al_channel *c, void *v) {
 
 int
 alchansendp(al_channel *c, void *v) {
-	return alchansendp(c, &v);
+	return alchansend(c, &v);
 }
 
 int
 alchansendul(al_channel *c, unsigned long v) {
-	return alchansend(c, &v);
+	unsigned long *ptr = malloc(sizeof(unsigned long));
+	*ptr = v;
+	return alchansend(c, &ptr);
 }
