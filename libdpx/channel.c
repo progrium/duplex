@@ -348,6 +348,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 				} else if (frame->last && c->server) {
 					_dpx_channel_close(c, DPX_ERROR_NONE);
 				}
+				DEBUG_FUNC(printf("(%d) Sent data frame for channel %d: %d bytes\n", c->peer->index, c->id, frame->payloadSize));
 				break;
 			}
 		}

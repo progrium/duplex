@@ -14,7 +14,6 @@ struct _al_ch_list {
 struct al_channel {
 	QLock			lock;
 
-	Rendez          rcond;
 	Rendez          wcond;
 
 	int				closed;
@@ -43,7 +42,7 @@ alchanclose(al_channel *c) {
 	qlock(&c->lock);
 
 	c->closed = 1;
-	taskwakeupall(&c->rcond);
+
 	taskwakeupall(&c->wcond);
 	// ^ anything waiting on a channel must now realise it's closed
 
@@ -92,11 +91,11 @@ alchannbrecv(al_channel *c, void *v) {
 	free(head->elem);
 	free(head);
 
-	// signal to wcond that we just freed an element
-	taskwakeupall(&c->wcond);
-
 _alchannbrecv_cleanup:
 	qunlock(&c->lock);
+
+	// signal regardless
+	taskwakeupall(&c->wcond);
 
 	return ret;
 }
@@ -125,7 +124,7 @@ alchanrecv(al_channel *c, void *v) {
 		if (result != ALCHAN_NONE)
 			return result;
 
-		tasksleep(&c->rcond);
+		taskdelay(0);
 	}
 }
 
@@ -195,9 +194,6 @@ _alchansend(al_channel *c, void *v, int block) {
 	}
 
 	c->cursize++;
-
-	// let readers know that we've just inserted an element
-	taskwakeupall(&c->rcond);
 
 	// if buffer is overfull and we're blocking, block
 	// (special condition for 0: block always)

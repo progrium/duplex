@@ -156,6 +156,7 @@ msgpack_sbuffer* _dpx_frame_msgpack_to(dpx_frame *frame);
 // -------------------------- { duplex connection } ---------------------------
 #define DPX_DUPLEX_CONN_CHUNK 8192
 #define DPX_DUPLEX_CONN_BUFFER 65536
+#define DPX_DUPLEX_CONN_FRAME_BUFFER 1024
 
 struct dpx_channel_map {
 	int key;

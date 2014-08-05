@@ -9,7 +9,7 @@ void dpx_frame_free(dpx_frame *frame) {
 
 		alchanfree(frame->errCh);
 	}
-	
+
 	if (frame->method != NULL)
 		free(frame->method);
 	if (frame->error != NULL)
@@ -26,7 +26,7 @@ void dpx_frame_free(dpx_frame *frame) {
 dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	dpx_frame *frame = malloc(sizeof(dpx_frame));
 
-	frame->errCh = alchancreate(sizeof(DPX_ERROR), 0);
+	frame->errCh = NULL;
 	frame->chanRef = ch;
 
 	frame->type = 0;

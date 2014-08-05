@@ -8,7 +8,7 @@ dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd) {
 	c->peer = p;
 	c->connfd = fd;
 	fdnoblock(c->connfd);
-	c->writeCh = alchancreate(sizeof(dpx_frame*), 0);
+	c->writeCh = alchancreate(sizeof(dpx_frame*), DPX_DUPLEX_CONN_FRAME_BUFFER);
 	c->channels = NULL;
 
 	return c;
