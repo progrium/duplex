@@ -355,6 +355,9 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 _dpx_peer_close_cleanup:
 	qunlock(p->lock);
+	taskdelay(0); // needed to make sure other coroutines cleanup
+	// [thankfully this is only a read not a write]
+	// [from valgrind: because of p->closed at _dpx_peer_bind_task]
 	return ret;
 }
 
