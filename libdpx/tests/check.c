@@ -52,6 +52,8 @@ void* test_alchan_1(void* v) {
 	ck_assert_int_eq(number, get_back);
 
 	ck_assert_int_eq(alchannbrecv(test, NULL), ALCHAN_NONE);
+
+	return NULL;
 }
 
 void* test_alchan_2(void* v) {
@@ -80,6 +82,8 @@ void* test_alchan_2(void* v) {
 	free(number);
 
 	ck_assert_int_eq(alchannbrecv(test, NULL), ALCHAN_NONE);
+
+	return NULL;
 }
 
 void* test_alchan_3(void* v) {
@@ -99,6 +103,8 @@ void* test_alchan_3(void* v) {
 
 	ck_assert_int_eq(alchanrecv(test, NULL), ALCHAN_CLOSED);
 	ck_assert_int_eq(alchansend(test, NULL), ALCHAN_CLOSED);
+
+	return NULL;
 }
 
 START_TEST(test_alchan) {
