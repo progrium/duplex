@@ -1,7 +1,7 @@
 /* Copyright (c) 2005 Russ Cox, MIT; see COPYRIGHT */
 
-#ifndef _TASK_H_
-#define _TASK_H_ 1
+#ifndef TASK_H
+#define TASK_H 1
 
 #ifdef __cplusplus
 extern "C" {

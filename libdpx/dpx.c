@@ -169,7 +169,12 @@ void dpx_init() {
 	c->task_sock = task_sock;
 	c->name = name;
 
-	pthread_create(&c->task_thread, NULL, &_dpx_libtask_thread, NULL);
+	int err = pthread_create(&c->task_thread, NULL, &_dpx_libtask_thread, NULL);
+
+	if (err) {
+		fprintf(stderr, "failed to initialise dpx_init thread: %s\n", strerror(err));
+		abort();
+	}
 	pthread_detach(c->task_thread);
 }
 
