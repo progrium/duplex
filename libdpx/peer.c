@@ -293,8 +293,11 @@ dpx_channel* _dpx_peer_open(dpx_peer *p, char *method) {
 		goto _dpx_peer_open_cleanup;
 
 	ret = _dpx_channel_new_client(p, method);
-	dpx_frame* frame = dpx_frame_new(ret);
+	dpx_frame* frame = dpx_frame_new();
 
+	frame->chanRef = ret;
+	frame->channel = ret->id;
+	
 	frame->type = DPX_FRAME_OPEN;
 	frame->method = malloc(strlen(method) + 1);
 	strcpy(frame->method, method);

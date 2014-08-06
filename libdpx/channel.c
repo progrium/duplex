@@ -274,7 +274,7 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 		goto _dpx_channel_send_frame_cleanup;
 	}
 
-	dpx_frame *copy = dpx_frame_new(NULL);
+	dpx_frame *copy = dpx_frame_new();
 
 	dpx_frame_copy(copy, frame);
 

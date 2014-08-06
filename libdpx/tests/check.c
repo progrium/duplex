@@ -139,7 +139,7 @@ START_TEST(test_dpx_peer_frame_send_receive) {
 
 	// client -> server
 
-	dpx_frame* client_input = dpx_frame_new(client_chan);
+	dpx_frame* client_input = dpx_frame_new();
 
 	char* payload = malloc(3);
 	*payload = 49;
@@ -163,7 +163,7 @@ START_TEST(test_dpx_peer_frame_send_receive) {
 
 	// server -> client
 
-	dpx_frame* server_output = dpx_frame_new(server_chan);
+	dpx_frame* server_output = dpx_frame_new();
 
 	payload = malloc(3);
 	*payload = 51;
@@ -221,7 +221,7 @@ char* test_dpx_reverse(char* orig, int size) {
 
 void test_dpx_call(dpx_peer* peer, char* method, char* payload, int payload_size, char** receive, int* receive_size) {
 	dpx_channel* chan = dpx_peer_open(peer, method);
-	dpx_frame* req = dpx_frame_new(chan);
+	dpx_frame* req = dpx_frame_new();
 
 	req->payload = payload;
 	req->payloadSize = payload_size;
@@ -320,7 +320,7 @@ void* test_dpx_receive_id(void* v) {
 
 		if (!strcmp(dpx_channel_method_get(chan), "foo")) {
 			dpx_frame* req = dpx_channel_receive_frame(chan);
-			dpx_frame* resp = dpx_frame_new(chan);
+			dpx_frame* resp = dpx_frame_new();
 			resp->payload = test_dpx_reverse(req->payload, req->payloadSize);
 			resp->payloadSize = req->payloadSize + 1;
 

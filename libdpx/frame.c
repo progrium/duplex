@@ -25,19 +25,14 @@ void dpx_frame_free(dpx_frame *frame) {
 	free(frame);
 }
 
-dpx_frame* dpx_frame_new(dpx_channel *ch) {
-	dpx_frame *frame = malloc(sizeof(dpx_frame));
-
+void dpx_frame_init(dpx_frame *frame) {
 	frame->errCh = NULL;
-	frame->chanRef = ch;
+	frame->chanRef = NULL;
 
 	frame->type = 0;
-	if (ch != NULL)
-		frame->channel = ch->id;
-	else
-		frame->channel = DPX_FRAME_NOCH;
-
+	frame->channel = DPX_FRAME_NOCH;
 	frame->method = NULL;
+	
 	frame->headers = NULL;
 
 	frame->error = NULL;
@@ -45,6 +40,12 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 
 	frame->payload = NULL;
 	frame->payloadSize = 0;
+}
+
+dpx_frame* dpx_frame_new() {
+	dpx_frame *frame = malloc(sizeof(dpx_frame));
+
+	dpx_frame_init(frame);
 
 	return frame;
 }
@@ -157,7 +158,7 @@ dpx_frame* _dpx_frame_msgpack_from(msgpack_object *obj) {
 	assert(arr.size == DPX_PACK_ARRAY_SIZE);
 
 	// create frame
-	dpx_frame* frame = dpx_frame_new(NULL);
+	dpx_frame* frame = dpx_frame_new();
 
 	msgpack_object* o = arr.ptr;
 

@@ -27,7 +27,7 @@ main(int argc, char* argv[])
 
 	dpx_channel* chan = dpx_peer_open(p, "perf");
 
-	dpx_frame *frame = dpx_frame_new(chan);
+	dpx_frame *frame = dpx_frame_new();
 	frame->payload = calloc(1, msg_size);
 	frame->payloadSize = msg_size;
 

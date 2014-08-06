@@ -111,7 +111,12 @@ struct _dpx_frame {
 
 // object tors
 void dpx_frame_free(dpx_frame *frame);
-dpx_frame* dpx_frame_new(dpx_channel *ch);
+
+// you can initialise it if you declare it and then init
+void dpx_frame_init(dpx_frame *frame);
+// or grab a heap-allocated one
+dpx_frame* dpx_frame_new();
+
 void dpx_frame_copy(dpx_frame *new, const dpx_frame *old);
 
 // functions (char* are always copied)
