@@ -42,7 +42,7 @@ func helperAdd(p *unsafe.Pointer, k *C.char, v *C.char) {
 }
 
 func toCFrame(frame *Frame) *C.dpx_frame {
-	cframe := C.dpx_frame_new(nil)
+	cframe := C.dpx_frame_new()
 	cframe.headers = nil
 	cframe.error = C.CString(frame.Error)
 	if frame.Last {
