@@ -71,7 +71,7 @@ void dpx_frame_copy(dpx_frame *new, const dpx_frame *old) {
 	dpx_frame_header_iter(old, _dpx_frame_copy_header_iter, new);
 
 	if (old->error != NULL) {
-		new->error = malloc(strlen(new->error) + 1);
+		new->error = malloc(strlen(old->error) + 1);
 		strcpy(new->error, old->error);
 	}
 
