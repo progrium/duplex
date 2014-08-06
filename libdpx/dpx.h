@@ -112,6 +112,7 @@ struct _dpx_frame {
 // object tors
 void dpx_frame_free(dpx_frame *frame);
 dpx_frame* dpx_frame_new(dpx_channel *ch);
+void dpx_frame_copy(dpx_frame *new, const dpx_frame *old);
 
 // functions (char* are always copied)
 char* dpx_frame_header_add(dpx_frame *frame, char* key, char* value);

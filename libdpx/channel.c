@@ -274,11 +274,15 @@ DPX_ERROR _dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame) {
 		goto _dpx_channel_send_frame_cleanup;
 	}
 
-	frame->chanRef = c;
-	frame->channel = c->id;
-	frame->type = DPX_FRAME_DATA;
+	dpx_frame *copy = dpx_frame_new(NULL);
 
-	alchansend(c->outgoing, &frame);
+	dpx_frame_copy(copy, frame);
+
+	copy->chanRef = c;
+	copy->channel = c->id;
+	copy->type = DPX_FRAME_DATA;
+
+	alchansend(c->outgoing, &copy);
 
 _dpx_channel_send_frame_cleanup:
 	qunlock(c->lock);
@@ -351,6 +355,8 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 				DEBUG_FUNC(printf("(%d) Sent data frame for channel %d: %d bytes\n", c->peer->index, c->id, frame->payloadSize));
 				break;
 			}
+			free(frame->payload);
+			dpx_frame_free(frame);
 		}
 
 		if (!c->closed) {

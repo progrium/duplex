@@ -229,6 +229,8 @@ void test_dpx_call(dpx_peer* peer, char* method, char* payload, int payload_size
 
 	ck_assert_msg(dpx_channel_send_frame(chan, req) == DPX_ERROR_NONE, "Shouldn't encounter errors sending input.");
 
+	dpx_frame_free(req);
+
 	dpx_frame* resp = dpx_channel_receive_frame(chan);
 	*receive = resp->payload;
 	*receive_size = resp->payloadSize;
@@ -252,9 +254,13 @@ void* test_dpx_receive(void* v) {
 
 			printf("payload: %.*s, payload size: %d\n", 3, resp->payload, resp->payloadSize);
 			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
+
+			free(req->payload);
+			dpx_frame_free(req);
+			free(resp->payload);
+			dpx_frame_free(resp);
 		}
-		// FIXME We cannot free because we have pending ops
-		//dpx_channel_free(chan);
+		dpx_channel_free(chan);
 	}
 }
 
@@ -281,6 +287,8 @@ START_TEST(test_dpx_rpc_call) {
 	if (strncmp(receive, "321", 3)) {
 		ck_assert_msg(0, "Got bad response from strncmp: %.*s", 3, receive);
 	}
+
+	free(receive);
 
 	dpx_peer_close(server);
 
@@ -321,9 +329,13 @@ void* test_dpx_receive_id(void* v) {
 
 			printf("payload: %.*s, payload size: %d\n", 4, resp->payload, resp->payloadSize);
 			ck_assert_msg(dpx_channel_send_frame(chan, resp) == DPX_ERROR_NONE, "failed to send frame back");
+
+			free(req->payload);
+			dpx_frame_free(req);
+			free(resp->payload);
+			dpx_frame_free(resp);
 		}
-		// FIXME we cannot free because we have pending ops
-		//dpx_channel_free(chan);
+		dpx_channel_free(chan);
 	}
 }
 
@@ -422,7 +434,17 @@ START_TEST(test_dpx_round_robin_async) {
 	pthread_join(server2thread, NULL);
 	pthread_join(server3thread, NULL);
 
+	free(t1);
+	free(t2);
+	free(t3);
+
 	dpx_peer_close(client);
+
+	dpx_peer_free(server1);
+	dpx_peer_free(server2);
+	dpx_peer_free(server3);
+	dpx_peer_free(client);
+
 	dpx_cleanup();
 
 } END_TEST
@@ -457,6 +479,10 @@ START_TEST(test_dpx_async_messaging) {
 	pthread_join(server_thread, NULL);
 
 	dpx_peer_close(client);
+
+	dpx_peer_free(server);
+	dpx_peer_free(client);
+
 	dpx_cleanup();
 
 } END_TEST

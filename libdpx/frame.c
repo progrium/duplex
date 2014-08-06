@@ -18,6 +18,8 @@ void dpx_frame_free(dpx_frame *frame) {
 	dpx_header_map *current, *tmp;
 	HASH_ITER(hh, frame->headers, current, tmp) {
 		HASH_DEL(frame->headers, current);
+		free(current->key);
+		free(current->value);
 		free(current);
 	}
 	free(frame);
@@ -45,6 +47,40 @@ dpx_frame* dpx_frame_new(dpx_channel *ch) {
 	frame->payloadSize = 0;
 
 	return frame;
+}
+
+void _dpx_frame_copy_header_iter(void* arg, char* k, char* v) {
+	dpx_frame *new = arg;
+
+	dpx_frame_header_add(new, k, v);
+}
+
+void dpx_frame_copy(dpx_frame *new, const dpx_frame *old) {
+	memset(new, 0, sizeof(dpx_frame));
+
+	new->chanRef = old->chanRef;
+	new->type = old->type;
+
+	new->channel = old->channel;
+
+	if (old->method != NULL) {
+		new->method = malloc(strlen(old->method) + 1);
+		strcpy(new->method, old->method);
+	}
+
+	dpx_frame_header_iter(old, _dpx_frame_copy_header_iter, new);
+
+	if (old->error != NULL) {
+		new->error = malloc(strlen(new->error) + 1);
+		strcpy(new->error, old->error);
+	}
+
+	new->last = old->last;
+
+	new->payload = malloc(old->payloadSize);
+	memmove(new->payload, old->payload, old->payloadSize);
+	
+	new->payloadSize = old->payloadSize;
 }
 
 char* dpx_frame_header_add(dpx_frame *frame, char* key, char* value) {
