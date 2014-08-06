@@ -45,5 +45,8 @@ func (c *Channel) ReceiveFrame() *Frame {
 }
 
 func (c *Channel) SendFrame(frame *Frame) error {
-	return ParseError(int64(C.dpx_channel_send_frame(c.ch, toCFrame(frame))))
+	cframe := toCFrame(frame)
+	err := ParseError(int64(C.dpx_channel_send_frame(c.ch, cframe)))
+	C.dpx_frame_free(cframe)
+	return err
 }
