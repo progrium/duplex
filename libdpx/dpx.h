@@ -1,5 +1,5 @@
-#ifndef DPX_H
-#define DPX_H 1
+#ifndef DUPLEX_H
+#define DUPLEX_H 1
 
 #ifdef __cplusplus
 extern "C" {
