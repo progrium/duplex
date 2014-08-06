@@ -58,10 +58,10 @@ class Frame(object):
 
     def to_c(self):
         dfn = dpx.dpx_frame_new
-        dfn.argtypes = [c_void_p]
+        dfn.argtypes = []
         dfn.restype = POINTER(CFRAME)
 
-        cframeptr = dfn(None)
+        cframeptr = dfn()
 
         cframe = cframeptr[0]
 
