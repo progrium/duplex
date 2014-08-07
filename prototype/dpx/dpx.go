@@ -119,6 +119,10 @@ func Open(peer *Peer, method string) *Channel {
 	return peer.Open(method)
 }
 
+func OpenWith(peer *Peer, uuid, method string) (*Channel, error) {
+	return peer.OpenWith(uuid, method)
+}
+
 // Server operations
 
 // blocks

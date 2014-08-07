@@ -2,8 +2,10 @@ package dpx
 
 import (
 	"bufio"
+	"errors"
 	"net"
 	"sync"
+	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/ugorji/go/codec"
 )
@@ -11,13 +13,43 @@ import (
 var RetryWaitSec = 1
 var RetryAttempts = 20
 
-func receiveGreeting(conn net.Conn) bool {
-	// TODO
-	return true
+func receiveGreeting(conn net.Conn) string {
+	peerUUID := make([]byte, 36)
+	read, err := conn.Read(peerUUID)
+
+	if read != 36 {
+		// FIXME does this mean the buffer hasn't filled or what?
+		// treat this as invalid right now [and investigate]
+		return ""
+	}
+
+	if err != nil {
+		return ""
+	}
+
+	parsed := uuid.Parse(string(peerUUID))
+	if parsed == nil {
+		// invalid uuid; die
+		return ""
+	}
+
+	debug("received greeting from ", conn.RemoteAddr(), ": ", parsed.String())
+
+	// this is valid, return it
+	return parsed.String()
 }
 
-func sendGreeting(conn net.Conn) error {
-	// TODO
+func sendGreeting(conn net.Conn, uuid string) error {
+	debug("sending greeting to ", conn.RemoteAddr(), ": ", uuid)
+	bytes, err := conn.Write([]byte(uuid))
+	if err != nil {
+		return err
+	}
+
+	if bytes != 36 {
+		// FIXME what
+		return errors.New("dpx: failed to send greeting")
+	}
 	return nil
 }
 
@@ -27,6 +59,7 @@ type duplexconn struct {
 	conn     net.Conn
 	writeCh  chan *Frame
 	channels map[int]*Channel
+	uuid     string
 }
 
 func (c *duplexconn) readFrames() {

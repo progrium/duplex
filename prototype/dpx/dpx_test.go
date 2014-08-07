@@ -25,6 +25,21 @@ func Call(peer *Peer, method string, arg interface{}) interface{} {
 	return resp.Payload
 }
 
+func CallTo(peer *Peer, uuid string, method string, arg interface{}) interface{} {
+	for {
+		ch, err := OpenWith(peer, uuid, method)
+		if err != nil {
+			continue
+		}
+		req := NewFrame(ch)
+		req.Payload = arg.([]byte)
+		req.Last = true
+		SendFrame(ch, req)
+		resp := ReceiveFrame(ch)
+		return resp.Payload
+	}
+}
+
 type ExamplePayload struct {
 	Message string
 }
@@ -244,4 +259,80 @@ func TestPeerSendReceiveCodec(t *testing.T) {
 	Close(s1)
 	Close(s2)
 
+}
+
+func TestSpecificPeerConnect(t *testing.T) {
+	client := NewPeer()
+	if err := Connect(client, "127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Connect(client, "127.0.0.1:9875"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Bind(client, "127.0.0.1:9874"); err != nil {
+		t.Fatal(err)
+	}
+	server1 := NewPeer()
+	if err := Bind(server1, "127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	server2 := NewPeer()
+	if err := Bind(server2, "127.0.0.1:9875"); err != nil {
+		t.Fatal(err)
+	}
+	server3 := NewPeer()
+	if err := Connect(server3, "127.0.0.1:9874"); err != nil {
+		t.Fatal(err)
+	}
+
+	serverResponses := make(chan string, 1)
+
+	serve := func(s *Peer) {
+		for {
+			method, ch := Accept(s)
+			if ch != nil && method == "foo" {
+				serverResponses <- s.Name()
+				req := ReceiveFrame(ch)
+				resp := NewFrame(ch)
+				resp.Payload = Reverse(req.Payload)
+				SendFrame(ch, resp)
+			}
+		}
+	}
+
+	go serve(server1)
+	go serve(server2)
+	go serve(server3)
+
+	resp1 := CallTo(client, server1.Name(), "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp1, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+
+	if s := <-serverResponses; s != server1.Name() {
+		t.Fatal("failed to call to specific server", s, server1.Name())
+	}
+
+	resp3 := CallTo(client, server3.Name(), "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp3, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+
+	if s := <-serverResponses; s != server3.Name() {
+		t.Fatal("failed to call to specific server", s, server3.Name())
+	}
+
+	resp2 := CallTo(client, server2.Name(), "foo", []byte{1, 2, 3}).([]byte)
+	if !bytes.Equal(resp2, []byte{3, 2, 1}) {
+		t.Fatal("response not reverse bytes")
+	}
+
+	if s := <-serverResponses; s != server2.Name() {
+		t.Fatal("failed to call to specific server", s, server2.Name())
+	}
+
+	Close(server1)
+	Close(server2)
+	Close(server3)
+	Close(client)
 }

@@ -161,3 +161,11 @@ func (c *Channel) pumpOutgoing() {
 		}
 	}
 }
+
+func (c *Channel) Target() string {
+	if c.conn == nil {
+		return ""
+	}
+
+	return c.conn.uuid
+}
