@@ -6,7 +6,7 @@ setup:
 	mkdir -pv .libs
 
 $(DIRECTORIES): always
-	$(foreach dir,$(DIRECTORIES),$(MAKE) -C $(dir); mv -v $(dir)/*.a .libs;)
+	$(foreach dir,$(DIRECTORIES),$(MAKE) -C $(dir); cp -uv $(dir)/*.a .libs;)
 
 always:
 	@true
