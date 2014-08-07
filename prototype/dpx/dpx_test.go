@@ -291,6 +291,9 @@ func TestSpecificPeerConnect(t *testing.T) {
 		for {
 			method, ch := Accept(s)
 			if ch != nil && method == "foo" {
+				if ch.Target() != client.Name() {
+					t.Fatal("client is not right", ch.Target(), client.Name())
+				}
 				serverResponses <- s.Name()
 				req := ReceiveFrame(ch)
 				resp := NewFrame(ch)
