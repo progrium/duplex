@@ -71,6 +71,7 @@ func (c *duplexconn) readFrames() {
 		if err != nil {
 			debug(err)
 			close(c.writeCh)
+			c.peer.Drop(c.uuid)
 			return
 		}
 		debug("Reading frame:", frame)
