@@ -116,6 +116,7 @@ struct _dpx_channel {
 	int last;
 	al_channel *incoming;
 	al_channel *outgoing;
+	al_channel *ocleanup;
 	DPX_ERROR err;
 	char* method;
 };
