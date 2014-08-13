@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -38,15 +39,19 @@ func newPeer() *Peer {
 
 	runtime.SetFinalizer(p, func(p *Peer) {
 		C.dpx_peer_close(p.peer)
-		C.dpx_peer_free(p.peer)
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			C.dpx_peer_free(p.peer)
 
-		init_mutex.Lock()
-		defer init_mutex.Unlock()
-		has_init--
+			init_mutex.Lock()
+			defer init_mutex.Unlock()
+			has_init--
 
-		if has_init == 0 {
-			C.dpx_cleanup()
-		}
+			if has_init == 0 {
+				C.dpx_cleanup()
+			}
+		}()
+
 	})
 
 	return p

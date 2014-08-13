@@ -4,7 +4,11 @@ package dpx
 // #include <dpx.h>
 import "C"
 
-import "runtime"
+import (
+	"time"
+
+	"runtime"
+)
 
 var ChannelQueueHWM = 1024
 
@@ -19,7 +23,11 @@ func fromCChannel(ch *C.dpx_channel) *Channel {
 
 	channel := &Channel{ch: ch}
 	runtime.SetFinalizer(channel, func(x *Channel) {
-		C.dpx_channel_free(x.ch)
+		C.dpx_channel_close(x.ch, 1)
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			C.dpx_channel_free(x.ch)
+		}()
 	})
 	return channel
 }

@@ -250,7 +250,7 @@ void* test_dpx_receive(void* v) {
 	while (1) {
 		dpx_channel* chan = dpx_peer_accept(server);
 		if (chan == NULL)
-			pthread_exit(NULL);
+			return NULL;
 
 		if (!strcmp(dpx_channel_method_get(chan), "foo")) {
 			dpx_frame* req = dpx_channel_receive_frame(chan);
