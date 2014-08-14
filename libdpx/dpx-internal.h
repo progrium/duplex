@@ -1,10 +1,10 @@
 #include <msgpack.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <task.h>
 #include <unistd.h>
 
 #include "dpx.h"
+#include "vendor/libtask/task.h"
 #include "uthash.h"
 
 //#define NDEBUG

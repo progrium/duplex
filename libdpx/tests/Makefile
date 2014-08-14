@@ -20,7 +20,7 @@ check: check_dpx
 	./check_dpx
 
 CC=gcc
-CFLAGS=-Wall -I. -I.. -ggdb -Wl,-rpath .. -L.. -ldpx -ltask -lmsgpack -pthread `pkg-config --cflags --libs check`
+CFLAGS=-Wall -I. -I.. -ggdb -Wl,-rpath .. -L.. -ldpx -pthread `pkg-config --cflags --libs check`
 
 %.o: %.c
 	$(CC) -c $*.c $(CFLAGS)
