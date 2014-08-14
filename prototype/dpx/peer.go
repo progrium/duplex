@@ -32,7 +32,7 @@ func newPeer() *Peer {
 		openFrames:       make(chan *Frame, ChannelQueueHWM),
 		incomingChannels: make(chan *Channel, 1024),
 		firstConn:        make(chan struct{}),
-		uuid:             uuid.NewUUID().String(),
+		uuid:             uuid.New(),
 	}
 	peerIndex += 1
 	go s.routeOpenFrames()
