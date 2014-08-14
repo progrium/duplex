@@ -10,7 +10,7 @@ type Frame struct {
 	errCh   chan error
 	chanRef *Channel
 
-	Target string
+	target string
 
 	Type    int
 	Channel int
