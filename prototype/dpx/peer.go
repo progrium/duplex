@@ -84,9 +84,9 @@ func (s *Peer) routeOpenFrames() {
 			var conn *duplexconn
 			var index int
 
-			if frame.Target != "" {
+			if frame.target != "" {
 				for i, v := range s.conns {
-					if v.uuid == frame.Target {
+					if v.uuid == frame.target {
 						conn = v
 						index = i
 						break
@@ -260,7 +260,7 @@ func (p *Peer) OpenWith(uuid string, method string) (*Channel, error) {
 
 	channel := newClientChannel(p, method)
 	frame := newFrame(channel)
-	frame.Target = uuid
+	frame.target = uuid
 	frame.Type = OpenFrame
 	frame.Method = method
 	p.openFrames <- frame
