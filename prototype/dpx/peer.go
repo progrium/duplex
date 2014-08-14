@@ -266,3 +266,37 @@ func (p *Peer) OpenWith(uuid string, method string) (*Channel, error) {
 	p.openFrames <- frame
 	return channel, nil
 }
+
+func (p *Peer) Drop(uuid string) error {
+	p.Lock()
+	defer p.Unlock()
+	if p.closed {
+		return errors.New("dpx: peer is already closed")
+	}
+
+	// verify that the uuid is valid
+	var conn *duplexconn
+	var index int
+
+	for i, v := range p.conns {
+		if v.uuid == uuid {
+			conn = v
+			index = i
+			break
+		}
+	}
+
+	if conn == nil {
+		return errors.New("dpx: no such peer with uuid")
+	}
+
+	for _, v := range conn.channels {
+		v.close(errors.New("dpx: connection dropped"))
+	}
+
+	conn.conn.Close()
+	// I don't check for io.EOF because it could be something else, too...
+
+	p.conns = append(p.conns[:index], p.conns[index+1:]...)
+	return nil
+}
