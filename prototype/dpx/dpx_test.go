@@ -292,8 +292,8 @@ func TestSpecificPeerConnect(t *testing.T) {
 		for {
 			method, ch := Accept(s)
 			if ch != nil && method == "foo" {
-				if ch.Target() != client.Name() {
-					t.Fatal("client is not right", ch.Target(), client.Name())
+				if ch.Peer() != client.Name() {
+					t.Fatal("client is not right", ch.Peer(), client.Name())
 				}
 				serverResponses <- s.Name()
 				req := ReceiveFrame(ch)
@@ -371,8 +371,8 @@ func TestPeerDropConnection(t *testing.T) {
 		for {
 			method, ch := Accept(s)
 			if ch != nil && method == "foo" {
-				if ch.Target() != client.Name() {
-					t.Fatal("client is not right", ch.Target(), client.Name())
+				if ch.Peer() != client.Name() {
+					t.Fatal("client is not right", ch.Peer(), client.Name())
 				}
 				req := ReceiveFrame(ch)
 				resp := NewFrame(ch)
@@ -382,7 +382,7 @@ func TestPeerDropConnection(t *testing.T) {
 				// drop the target
 				time.Sleep(1 * time.Second)
 
-				s.Drop(ch.Target())
+				s.Drop(ch.Peer())
 
 				time.Sleep(1 * time.Second)
 				serverResponses <- s.Name()
