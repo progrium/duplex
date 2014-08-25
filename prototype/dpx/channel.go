@@ -162,7 +162,7 @@ func (c *Channel) pumpOutgoing() {
 	}
 }
 
-func (c *Channel) Target() string {
+func (c *Channel) Peer() string {
 	if c.conn == nil {
 		return ""
 	}
