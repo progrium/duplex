@@ -76,6 +76,7 @@ DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);
 // properties
 char* dpx_channel_method_get(dpx_channel *c); // returns method
 char* dpx_channel_method_set(dpx_channel *c, char* method); // returns old one
+int dpx_channel_closed(dpx_channel *c); // check if channel is closed
 
 // -------------------------------- { frames } --------------------------------
 #define DPX_FRAME_OPEN 0

@@ -129,6 +129,10 @@ char* dpx_channel_method_set(dpx_channel *c, char* method) {
 	return (char*)ret;
 }
 
+int dpx_channel_closed(dpx_channel *c) {
+	return c->closed;
+}
+
 // ----------------------------------------------------------------------------
 
 dpx_channel* _dpx_channel_new() {

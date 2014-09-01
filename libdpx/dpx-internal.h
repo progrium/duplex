@@ -134,6 +134,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c);
 
 // dpx_channel_method_get --> dpx.h
 char* _dpx_channel_method_set(dpx_channel *c, char* method);
+// dpx_channel_closed --> dpx.h
 
 // -------------------------------- { frames } --------------------------------
 // #defines -> dpx.h
