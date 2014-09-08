@@ -147,6 +147,9 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 	return h.err;
 }
 
+int dpx_peer_closed(dpx_peer *p) {
+	return p->closed;
+}
 
 // ----------------------------------------------------------------------------
 

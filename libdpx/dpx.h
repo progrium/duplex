@@ -60,7 +60,8 @@ DPX_ERROR dpx_peer_close(dpx_peer *p);
 DPX_ERROR dpx_peer_connect(dpx_peer *p, char* addr, int port);
 DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
-// FIXME below not cleaned up yet
+// properties
+int dpx_peer_closed(dpx_peer *p); // check if peer is closed
 
 // ------------------------------- { channels } -------------------------------
 

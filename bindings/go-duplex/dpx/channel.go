@@ -5,8 +5,6 @@ package dpx
 import "C"
 
 import (
-	"time"
-
 	"runtime"
 )
 
@@ -23,13 +21,21 @@ func fromCChannel(ch *C.dpx_channel) *Channel {
 
 	channel := &Channel{ch: ch}
 	runtime.SetFinalizer(channel, func(x *Channel) {
-		C.dpx_channel_close(x.ch, 1)
-		go func() {
-			time.Sleep(500 * time.Millisecond)
-			C.dpx_channel_free(x.ch)
-		}()
+		if int(C.dpx_channel_closed(x.ch)) == 0 {
+			// memleak. drop the reference and leave it be.
+			return
+		}
+		C.dpx_channel_free(x.ch)
 	})
 	return channel
+}
+
+func (c *Channel) Closed() bool {
+	return int(C.dpx_channel_closed(c.ch)) != 0
+}
+
+func (c *Channel) Close(reason *DpxError) {
+	C.dpx_channel_close(c.ch, C.DPX_ERROR(reason.err))
 }
 
 func (c *Channel) Method() string {
