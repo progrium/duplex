@@ -4,7 +4,9 @@ package dpx
 // #include <dpx.h>
 import "C"
 
-import "runtime"
+import (
+	"runtime"
+)
 
 var ChannelQueueHWM = 1024
 
@@ -19,9 +21,21 @@ func fromCChannel(ch *C.dpx_channel) *Channel {
 
 	channel := &Channel{ch: ch}
 	runtime.SetFinalizer(channel, func(x *Channel) {
+		if int(C.dpx_channel_closed(x.ch)) == 0 {
+			// memleak. drop the reference and leave it be.
+			return
+		}
 		C.dpx_channel_free(x.ch)
 	})
 	return channel
+}
+
+func (c *Channel) Closed() bool {
+	return int(C.dpx_channel_closed(c.ch)) != 0
+}
+
+func (c *Channel) Close(reason *DpxError) {
+	C.dpx_channel_close(c.ch, C.DPX_ERROR(reason.err))
 }
 
 func (c *Channel) Method() string {

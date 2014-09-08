@@ -129,6 +129,10 @@ char* dpx_channel_method_set(dpx_channel *c, char* method) {
 	return (char*)ret;
 }
 
+int dpx_channel_closed(dpx_channel *c) {
+	return c->closed;
+}
+
 // ----------------------------------------------------------------------------
 
 dpx_channel* _dpx_channel_new() {
@@ -147,6 +151,7 @@ dpx_channel* _dpx_channel_new() {
 
 	ptr->incoming = alchancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
 	ptr->outgoing = alchancreate(sizeof(dpx_frame*), DPX_CHANNEL_QUEUE_HWM);
+	ptr->ocleanup = alchancreate(sizeof(unsigned long*), 1);
 
 	ptr->err = 0;
 	ptr->method = NULL;
@@ -160,6 +165,7 @@ void _dpx_channel_free(dpx_channel* c) {
 	alchanfree(c->connCh);
 	alchanfree(c->incoming);
 	alchanfree(c->outgoing);
+	alchanfree(c->ocleanup);
 
 	free(c->lock);
 	free(c->method);
@@ -201,21 +207,24 @@ void _dpx_channel_close(dpx_channel *c, DPX_ERROR err) {
 	qlock(c->lock);
 
 	if (c->closed) {
-		goto _dpx_channel_close_cleanup;
+		qunlock(c->lock);
+		return;
 	}
-	c->closed = 1;
-	c->err = err;
-
-	_dpx_duplex_conn_unlink_channel(c->conn, c);
 
 	alchanclose(c->connCh);
 	alchanclose(c->incoming);
 	alchanclose(c->outgoing);
 
-_dpx_channel_close_cleanup:
+	c->closed = 1;
+	c->err = err;
+
+	_dpx_duplex_conn_unlink_channel(c->conn, c);
+
 	qunlock(c->lock);
-	// yield tasks
-	taskdelay(50);
+
+	alchanrecvul(c->ocleanup);
+	alchanclose(c->ocleanup);
+
 }
 
 struct _dpx_channel_close_via_task_struct {
@@ -367,6 +376,9 @@ void _dpx_channel_pump_outgoing(dpx_channel *c) {
 _dpx_channel_pump_outgoing_cleanup:
 	DEBUG_FUNC(printf("(%d) Pumping finished for channel %d\n", c->peer->index, c->id));
 	c->conn = NULL;
+
+	alchansendul(c->ocleanup, 100);
+	taskexit(0);
 }
 
 char* _dpx_channel_method_set(dpx_channel *c, char* method) {

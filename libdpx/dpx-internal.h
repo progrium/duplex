@@ -102,6 +102,8 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p);
 DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port);
 DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
+// dpx_peer_closed --> dpx.h
+
 // ------------------------------- { channels } -------------------------------
 #define DPX_CHANNEL_QUEUE_HWM 1024
 
@@ -116,6 +118,7 @@ struct _dpx_channel {
 	int last;
 	al_channel *incoming;
 	al_channel *outgoing;
+	al_channel *ocleanup;
 	DPX_ERROR err;
 	char* method;
 };
@@ -133,6 +136,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c);
 
 // dpx_channel_method_get --> dpx.h
 char* _dpx_channel_method_set(dpx_channel *c, char* method);
+// dpx_channel_closed --> dpx.h
 
 // -------------------------------- { frames } --------------------------------
 // #defines -> dpx.h

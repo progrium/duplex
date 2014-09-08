@@ -36,17 +36,22 @@ func newPeer() *Peer {
 		peer: peer,
 	}
 
-	runtime.SetFinalizer(p, func(p *Peer) {
-		C.dpx_peer_close(p.peer)
+	runtime.SetFinalizer(p, func(x *Peer) {
+		if int(C.dpx_peer_closed(x.peer)) == 0 {
+			// memleak. drop the reference and leave it be.
+			return
+		}
 		C.dpx_peer_free(p.peer)
 
-		init_mutex.Lock()
-		defer init_mutex.Unlock()
-		has_init--
+		go func() {
+			init_mutex.Lock()
+			defer init_mutex.Unlock()
+			has_init--
 
-		if has_init == 0 {
-			C.dpx_cleanup()
-		}
+			if has_init == 0 {
+				C.dpx_cleanup()
+			}
+		}()
 	})
 
 	return p
@@ -62,6 +67,10 @@ func (p *Peer) Open(method string) *Channel {
 func (p *Peer) Accept() *Channel {
 	cChan := C.dpx_peer_accept(p.peer)
 	return fromCChannel(cChan)
+}
+
+func (p *Peer) Closed() bool {
+	return int(C.dpx_peer_closed(p.peer)) != 0
 }
 
 func (p *Peer) Close() error {
