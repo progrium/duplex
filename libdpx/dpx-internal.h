@@ -194,6 +194,8 @@ DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame);
 void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch);
 void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch);
 
+char* _dpx_duplex_conn_name(dpx_duplex_conn *c);
+
 // --------------------------- { alchan } -------------------------------------
 #define ALCHAN_NONE -1
 #define ALCHAN_CLOSED -2

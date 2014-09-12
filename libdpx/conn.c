@@ -170,3 +170,10 @@ void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 
 	qunlock(c->lock);
 }
+
+char* _dpx_duplex_conn_name(dpx_duplex_conn *c) {
+	uuid_t *uuid = c->uuid;
+	char* str_uuid = NULL;
+	assert(uuid_export(uuid, UUID_FMT_STR, &str_uuid, NULL) == UUID_RC_OK);
+	return str_uuid;
+}
