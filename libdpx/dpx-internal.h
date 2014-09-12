@@ -68,12 +68,13 @@ struct _dpx_peer_listener {
 
 typedef struct _dpx_peer_listener dpx_peer_listener;
 
-struct _dpx_peer_connection {
+struct _dpx_peer_connection_map {
+	char *uuid;
 	dpx_duplex_conn *conn;
-	struct _dpx_peer_connection *next;
+	UT_hash_handle hh;
 };
 
-typedef struct _dpx_peer_connection dpx_peer_connection;
+typedef struct _dpx_peer_connection_map dpx_peer_connection_map;
 
 struct _dpx_peer {
 	QLock *lock;
@@ -81,7 +82,8 @@ struct _dpx_peer {
 	uuid_t *uuid;
 
 	dpx_peer_listener *listeners; // listener fds
-	dpx_peer_connection *conns;
+	dpx_peer_connection_map *conns; // connections
+
 	al_channel* openFrames;
 	al_channel* incomingChannels;
 	int closed;

@@ -176,10 +176,10 @@ void _dpx_peer_free(dpx_peer *p) {
 		free(l);
 	}
 
-	dpx_peer_connection *c, *nc;
-	for (c=p->conns; c != NULL; c=nc) {
+	dpx_peer_connection_map *c, *nc;
+	HASH_ITER(hh, p->conns, c, nc) {
+		HASH_DEL(p->conns, c);
 		_dpx_duplex_conn_free(c->conn);
-		nc = c->next;
 		free(c);
 	}
 
@@ -226,21 +226,17 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd, uuid_t *uuid) {
 	dpx_duplex_conn* dc = _dpx_duplex_conn_new(p, fd, uuid);
 	qlock(p->lock);
 
-	dpx_peer_connection* add = malloc(sizeof(dpx_peer_connection));
+	dpx_peer_connection_map* add = malloc(sizeof(dpx_peer_connection_map));
+	add->uuid = _dpx_duplex_conn_name(dc);
 	add->conn = dc;
-	add->next = NULL;
 
 	DEBUG_FUNC(printf("(%d) Accepting connection.\n", p->index));
 
-	dpx_peer_connection* conn = p->conns;
-	if (conn == NULL) {
-		p->conns = add;
+	dpx_peer_connection_map* conn = p->conns;
+	HASH_ADD_KEYPTR(hh, p->conns, add->uuid, strlen(add->uuid), add);
+
+	if (HASH_COUNT(p->conns) == 1)
 		alchansend(p->firstConn, &byte);
-	} else {
-		while (conn->next != NULL)
-			conn = conn->next;
-		conn->next = add;
-	}
 
 	qunlock(p->lock);
 
@@ -248,32 +244,24 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd, uuid_t *uuid) {
 	taskcreate(&_dpx_duplex_conn_write_frames, dc, DPX_TASK_STACK_SIZE);
 }
 
-int _dpx_peer_connlen(dpx_peer *p) {
-	int connlen = 0;
-	dpx_peer_connection *tmp;
-	for (tmp=p->conns; tmp != NULL; tmp=tmp->next)
-		connlen++;
-	return connlen;
-}
-
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
-	int connlen = _dpx_peer_connlen(p);
+	int connlen = HASH_COUNT(p->conns);
 
 	assert(connlen != 0);
 
 	int index = p->rrIndex % connlen;
 	qlock(p->lock);
 
-	dpx_peer_connection *tmp;
+	dpx_peer_connection_map *m;
 	int i = 0;
-	for (tmp=p->conns; i < index; tmp=tmp->next)
+	for (m = p->conns; i < index; m = m->hh.next)
 		i++;
 
 	p->rrIndex++;
 
 	qunlock(p->lock);
 
-	*conn = tmp->conn;
+	*conn = m->conn;
 	return index;
 }
 
@@ -286,7 +274,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 		alchanrecvp(p->firstConn); // we don't care about the ret value
 		DEBUG_FUNC(printf("(%d) First connection, routing...\n", p->index));
 
-		while (_dpx_peer_connlen(p) > 0) {
+		while (HASH_COUNT(p->conns) > 0) {
 			if (err == DPX_ERROR_NONE) {
 				if (alchanrecv(p->openFrames, &frame) == ALCHAN_CLOSED)
 					return;
@@ -372,11 +360,9 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 	alchanclose(p->incomingChannels);
 
-	dpx_peer_connection *c, *nc;
-	for (c=p->conns; c != NULL; c=nc) {
+	dpx_peer_connection_map *c;
+	for (c = p->conns; c != NULL; c = c->hh.next)
 		_dpx_duplex_conn_close(c->conn);
-		nc = c->next;
-	}
 
 _dpx_peer_close_cleanup:
 	qunlock(p->lock);
