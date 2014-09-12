@@ -106,6 +106,7 @@ DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port);
 DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
 // dpx_peer_closed --> dpx.h
+char* _dpx_peer_name(dpx_peer *p);
 
 // ------------------------------- { channels } -------------------------------
 #define DPX_CHANNEL_QUEUE_HWM 1024

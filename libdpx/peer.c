@@ -151,6 +151,19 @@ int dpx_peer_closed(dpx_peer *p) {
 	return p->closed;
 }
 
+void* _dpx_peer_name_helper(void* v) {
+	dpx_peer *p = (dpx_peer*) v;
+	return _dpx_peer_name(p);
+}
+
+char* dpx_peer_name(dpx_peer *p) {
+	_dpx_a a;
+	a.function = &_dpx_peer_name_helper;
+	a.args = p;
+
+	return _dpx_joinfunc(&a);
+}
+
 // ----------------------------------------------------------------------------
 
 void _dpx_peer_free(dpx_peer *p) {
@@ -614,4 +627,10 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 _dpx_peer_bind_cleanup:
 	qunlock(p->lock);
 	return ret;
+}
+
+char* _dpx_peer_name(dpx_peer *p) {
+	char* str = NULL;
+	assert(uuid_export(p->uuid, UUID_FMT_STR, &str, NULL) == UUID_RC_OK);
+	return str;
 }
