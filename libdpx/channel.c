@@ -133,6 +133,21 @@ int dpx_channel_closed(dpx_channel *c) {
 	return c->closed;
 }
 
+void* _dpx_channel_peer_helper(void* v) {
+	dpx_channel *c = (dpx_channel*) v;
+	return _dpx_channel_peer(c);
+}
+
+char* dpx_channel_peer(dpx_channel *c) {
+	_dpx_a a;
+	a.function = &_dpx_channel_peer_helper;
+	a.args = c;
+
+	void* ret = _dpx_joinfunc(&a);
+
+	return (char*)ret;
+}
+
 // ----------------------------------------------------------------------------
 
 dpx_channel* _dpx_channel_new() {
@@ -298,6 +313,19 @@ _dpx_channel_send_frame_cleanup:
 	return ret;
 }
 
+char* _dpx_channel_method_set(dpx_channel *c, char* method) {
+	char* ret = c->method;
+	c->method = method;
+	return ret;
+}
+
+char* _dpx_channel_peer(dpx_channel *c) {
+	if (c->conn == NULL)
+		return NULL;
+
+	return _dpx_duplex_conn_name(c->conn);
+}
+
 int _dpx_channel_handle_incoming(dpx_channel *c, dpx_frame *frame) {
 	qlock(c->lock);
 
@@ -379,10 +407,4 @@ _dpx_channel_pump_outgoing_cleanup:
 
 	alchansendul(c->ocleanup, 100);
 	taskexit(0);
-}
-
-char* _dpx_channel_method_set(dpx_channel *c, char* method) {
-	char* ret = c->method;
-	c->method = method;
-	return ret;
 }

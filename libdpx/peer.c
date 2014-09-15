@@ -151,6 +151,19 @@ int dpx_peer_closed(dpx_peer *p) {
 	return p->closed;
 }
 
+void* _dpx_peer_name_helper(void* v) {
+	dpx_peer *p = (dpx_peer*) v;
+	return _dpx_peer_name(p);
+}
+
+char* dpx_peer_name(dpx_peer *p) {
+	_dpx_a a;
+	a.function = &_dpx_peer_name_helper;
+	a.args = p;
+
+	return _dpx_joinfunc(&a);
+}
+
 // ----------------------------------------------------------------------------
 
 void _dpx_peer_free(dpx_peer *p) {
@@ -163,10 +176,10 @@ void _dpx_peer_free(dpx_peer *p) {
 		free(l);
 	}
 
-	dpx_peer_connection *c, *nc;
-	for (c=p->conns; c != NULL; c=nc) {
+	dpx_peer_connection_map *c, *nc;
+	HASH_ITER(hh, p->conns, c, nc) {
+		HASH_DEL(p->conns, c);
 		_dpx_duplex_conn_free(c->conn);
-		nc = c->next;
 		free(c);
 	}
 
@@ -182,6 +195,9 @@ dpx_peer* _dpx_peer_new() {
 	dpx_peer* peer = (dpx_peer*) malloc(sizeof(dpx_peer));
 
 	peer->lock = calloc(1, sizeof(QLock));
+
+	assert(uuid_create(&peer->uuid) == UUID_RC_OK);
+	assert(uuid_make(peer->uuid, UUID_MAKE_V4) == UUID_RC_OK);
 
 	peer->listeners = NULL;
 	peer->conns = NULL;
@@ -206,25 +222,21 @@ dpx_peer* _dpx_peer_new() {
 	return peer;
 }
 
-void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
-	dpx_duplex_conn* dc = _dpx_duplex_conn_new(p, fd);
+void _dpx_peer_accept_connection(dpx_peer *p, int fd, uuid_t *uuid) {
+	dpx_duplex_conn* dc = _dpx_duplex_conn_new(p, fd, uuid);
 	qlock(p->lock);
 
-	dpx_peer_connection* add = malloc(sizeof(dpx_peer_connection));
+	dpx_peer_connection_map* add = malloc(sizeof(dpx_peer_connection_map));
+	add->uuid = _dpx_duplex_conn_name(dc);
 	add->conn = dc;
-	add->next = NULL;
 
 	DEBUG_FUNC(printf("(%d) Accepting connection.\n", p->index));
 
-	dpx_peer_connection* conn = p->conns;
-	if (conn == NULL) {
-		p->conns = add;
+	dpx_peer_connection_map* conn = p->conns;
+	HASH_ADD_KEYPTR(hh, p->conns, add->uuid, strlen(add->uuid), add);
+
+	if (HASH_COUNT(p->conns) == 1)
 		alchansend(p->firstConn, &byte);
-	} else {
-		while (conn->next != NULL)
-			conn = conn->next;
-		conn->next = add;
-	}
 
 	qunlock(p->lock);
 
@@ -232,32 +244,24 @@ void _dpx_peer_accept_connection(dpx_peer *p, int fd) {
 	taskcreate(&_dpx_duplex_conn_write_frames, dc, DPX_TASK_STACK_SIZE);
 }
 
-int _dpx_peer_connlen(dpx_peer *p) {
-	int connlen = 0;
-	dpx_peer_connection *tmp;
-	for (tmp=p->conns; tmp != NULL; tmp=tmp->next)
-		connlen++;
-	return connlen;
-}
-
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn) {
-	int connlen = _dpx_peer_connlen(p);
+	int connlen = HASH_COUNT(p->conns);
 
 	assert(connlen != 0);
 
 	int index = p->rrIndex % connlen;
 	qlock(p->lock);
 
-	dpx_peer_connection *tmp;
+	dpx_peer_connection_map *m;
 	int i = 0;
-	for (tmp=p->conns; i < index; tmp=tmp->next)
+	for (m = p->conns; i < index; m = m->hh.next)
 		i++;
 
 	p->rrIndex++;
 
 	qunlock(p->lock);
 
-	*conn = tmp->conn;
+	*conn = m->conn;
 	return index;
 }
 
@@ -270,7 +274,7 @@ void _dpx_peer_route_open_frames(dpx_peer *p) {
 		alchanrecvp(p->firstConn); // we don't care about the ret value
 		DEBUG_FUNC(printf("(%d) First connection, routing...\n", p->index));
 
-		while (_dpx_peer_connlen(p) > 0) {
+		while (HASH_COUNT(p->conns) > 0) {
 			if (err == DPX_ERROR_NONE) {
 				if (alchanrecv(p->openFrames, &frame) == ALCHAN_CLOSED)
 					return;
@@ -356,11 +360,9 @@ DPX_ERROR _dpx_peer_close(dpx_peer *p) {
 
 	alchanclose(p->incomingChannels);
 
-	dpx_peer_connection *c, *nc;
-	for (c=p->conns; c != NULL; c=nc) {
+	dpx_peer_connection_map *c;
+	for (c = p->conns; c != NULL; c = c->hh.next)
 		_dpx_duplex_conn_close(c->conn);
-		nc = c->next;
-	}
 
 _dpx_peer_close_cleanup:
 	qunlock(p->lock);
@@ -375,14 +377,53 @@ struct _dpx_peer_connect_task_param {
 	int port;
 };
 
-DPX_ERROR _dpx_peer_send_greeting(int connfd) {
-	// TODO
+DPX_ERROR _dpx_peer_send_greeting(int connfd, dpx_peer *p) {
+	void* sending_uuid = malloc(UUID_LEN_BIN);
+	size_t size = UUID_LEN_BIN;
+	assert(uuid_export(p->uuid, UUID_FMT_BIN, &sending_uuid, &size) == UUID_RC_OK);
+
+	fdnoblock(connfd);
+
+	DEBUG_FUNC(
+		char* str = NULL;
+		uuid_export(p->uuid, UUID_FMT_STR, &str, NULL);
+		printf("Sending greeting from %s\n", str);
+		free(str);
+	);
+
+	int len = fdwrite(connfd, sending_uuid, UUID_LEN_BIN);
+	if (len != UUID_LEN_BIN)
+		return DPX_ERROR_NETWORK_NOTALL;
+
 	return DPX_ERROR_NONE;
 }
 
-int _dpx_peer_receive_greeting(int connfd) {
-	// TODO
-	return 1;
+uuid_t* _dpx_peer_receive_greeting(int connfd) {
+	uuid_t *created;
+	assert(uuid_create(&created) == UUID_RC_OK); // this is the nil uuid
+
+	// retrieve the uuid in binary form. if the uuid is not valid,
+	// it returns the nil uuid.
+	void* receiving_uuid = malloc(UUID_LEN_BIN);
+
+	fdnoblock(connfd);
+
+	int len = fdread(connfd, receiving_uuid, UUID_LEN_BIN);
+	if (len != UUID_LEN_BIN) // failed to retrieve greeting, drop
+		return created;
+
+	// we can safely ignore ret value because uuid_t will stay nil
+	// on operation failure.
+	uuid_import(created, UUID_FMT_BIN, receiving_uuid, UUID_LEN_BIN);
+
+	DEBUG_FUNC(
+		char* str = NULL;
+		uuid_export(created, UUID_FMT_STR, &str, NULL);
+		printf("Received greeting from %s\n", str);
+		free(str);
+	);
+
+	return created;
 }
 
 void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
@@ -401,13 +442,29 @@ void _dpx_peer_connect_task(struct _dpx_peer_connect_task_param *param) {
 			taskdelay(DPX_PEER_RETRYMS);
 			continue;
 		}
-		if (_dpx_peer_send_greeting(connfd) != DPX_ERROR_NONE) {
-			fprintf(stderr, "(%d) Failed to make greeting...\n", p->index);
+
+		// retrieve UUIDs [send greeting, receive greeting]
+
+		if (_dpx_peer_send_greeting(connfd, p) != DPX_ERROR_NONE) {
+			fprintf(stderr, "(%d) Failed to send greeting.\n", p->index);
 			close(connfd);
 			goto _dpx_peer_connect_task_cleanup;
 		}
+
+		uuid_t *conn = _dpx_peer_receive_greeting(connfd);
+		int result;
+		assert(uuid_isnil(conn, &result) == UUID_RC_OK);
+
+		if (result) { // is nil
+			fprintf(stderr, "(%d) Failed to receive greeting.\n", p->index);
+			close(connfd);
+			assert(uuid_destroy(conn) == UUID_RC_OK);
+			goto _dpx_peer_connect_task_cleanup;
+		}
+
 		DEBUG_FUNC(printf("(%d) Connected.\n", p->index));
-		_dpx_peer_accept_connection(p, connfd);
+		_dpx_peer_accept_connection(p, connfd, conn);
+		assert(uuid_destroy(conn) == UUID_RC_OK);
 		goto _dpx_peer_connect_task_cleanup;
 	}
 
@@ -448,9 +505,26 @@ struct _dpx_peer_bind_task_param {
 void _dpx_peer_bind_task_accept(struct _dpx_peer_bind_task_param *param) {
 	taskname("_dpx_peer_bind_task_accept");
 
-	if (_dpx_peer_receive_greeting(param->connfd)) {
-		_dpx_peer_accept_connection(param->p, param->connfd);
+	uuid_t *conn = _dpx_peer_receive_greeting(param->connfd);
+	int result;
+	assert(uuid_isnil(conn, &result) == UUID_RC_OK);
+
+	if (result) { // is nil
+		fprintf(stderr, "failed to receive greeting from remote conn\n");
+		close(param->connfd);
+		free(param);
+		return;
 	}
+
+	if (_dpx_peer_send_greeting(param->connfd, param->p) != DPX_ERROR_NONE) {
+		fprintf(stderr, "failed to send greeting to remote conn\n");
+		close(param->connfd);
+		free(param);
+		return;
+	}
+
+	_dpx_peer_accept_connection(param->p, param->connfd, conn);
+	assert(uuid_destroy(conn) == UUID_RC_OK);
 
 	free(param);
 }
@@ -539,4 +613,10 @@ DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port) {
 _dpx_peer_bind_cleanup:
 	qunlock(p->lock);
 	return ret;
+}
+
+char* _dpx_peer_name(dpx_peer *p) {
+	char* str = NULL;
+	assert(uuid_export(p->uuid, UUID_FMT_STR, &str, NULL) == UUID_RC_OK);
+	return str;
 }

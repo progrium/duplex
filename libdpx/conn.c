@@ -1,10 +1,12 @@
 #include "dpx-internal.h"
 #include <string.h>
 
-dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd) {
+dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd, uuid_t *uuid) {
 	dpx_duplex_conn* c = (dpx_duplex_conn*) malloc(sizeof(dpx_duplex_conn));
 
 	c->lock = calloc(1, sizeof(QLock));
+	assert(uuid_clone(uuid, &c->uuid) == UUID_RC_OK);
+
 	c->peer = p;
 	c->connfd = fd;
 	fdnoblock(c->connfd);
@@ -27,6 +29,8 @@ void _dpx_duplex_conn_free(dpx_duplex_conn *c) {
 		HASH_DEL(c->channels, current);
 		free(current);
 	}
+
+	assert(uuid_destroy(c->uuid) == UUID_RC_OK);
 
 	free(c);
 }
@@ -165,4 +169,11 @@ void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch) {
 		HASH_DEL(c->channels, m);
 
 	qunlock(c->lock);
+}
+
+char* _dpx_duplex_conn_name(dpx_duplex_conn *c) {
+	uuid_t *uuid = c->uuid;
+	char* str_uuid = NULL;
+	assert(uuid_export(uuid, UUID_FMT_STR, &str_uuid, NULL) == UUID_RC_OK);
+	return str_uuid;
 }

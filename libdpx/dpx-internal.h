@@ -5,6 +5,7 @@
 
 #include "dpx.h"
 #include "vendor/libtask/task.h"
+#include "vendor/uuid/uuid.h"
 #include "uthash.h"
 
 //#define NDEBUG
@@ -67,18 +68,22 @@ struct _dpx_peer_listener {
 
 typedef struct _dpx_peer_listener dpx_peer_listener;
 
-struct _dpx_peer_connection {
+struct _dpx_peer_connection_map {
+	char *uuid;
 	dpx_duplex_conn *conn;
-	struct _dpx_peer_connection *next;
+	UT_hash_handle hh;
 };
 
-typedef struct _dpx_peer_connection dpx_peer_connection;
+typedef struct _dpx_peer_connection_map dpx_peer_connection_map;
 
 struct _dpx_peer {
 	QLock *lock;
 
+	uuid_t *uuid;
+
 	dpx_peer_listener *listeners; // listener fds
-	dpx_peer_connection *conns;
+	dpx_peer_connection_map *conns; // connections
+
 	al_channel* openFrames;
 	al_channel* incomingChannels;
 	int closed;
@@ -91,7 +96,7 @@ struct _dpx_peer {
 void _dpx_peer_free(dpx_peer *p);
 dpx_peer* _dpx_peer_new();
 
-void _dpx_peer_accept_connection(dpx_peer *p, int fd);
+void _dpx_peer_accept_connection(dpx_peer *p, int fd, uuid_t *uuid);
 int _dpx_peer_next_conn(dpx_peer *p, dpx_duplex_conn **conn);
 void _dpx_peer_route_open_frames(dpx_peer *p);
 
@@ -103,6 +108,7 @@ DPX_ERROR _dpx_peer_connect(dpx_peer *p, char* addr, int port);
 DPX_ERROR _dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
 // dpx_peer_closed --> dpx.h
+char* _dpx_peer_name(dpx_peer *p);
 
 // ------------------------------- { channels } -------------------------------
 #define DPX_CHANNEL_QUEUE_HWM 1024
@@ -137,6 +143,7 @@ void _dpx_channel_pump_outgoing(dpx_channel *c);
 // dpx_channel_method_get --> dpx.h
 char* _dpx_channel_method_set(dpx_channel *c, char* method);
 // dpx_channel_closed --> dpx.h
+char* _dpx_channel_peer(dpx_channel *c);
 
 // -------------------------------- { frames } --------------------------------
 // #defines -> dpx.h
@@ -172,6 +179,7 @@ typedef struct dpx_channel_map dpx_channel_map;
 
 struct _dpx_duplex_conn {
 	QLock *lock;
+	uuid_t *uuid;
 	dpx_peer *peer;
 	int connfd;
 	al_channel* writeCh;
@@ -180,13 +188,15 @@ struct _dpx_duplex_conn {
 
 void _dpx_duplex_conn_free(dpx_duplex_conn *c); // BEWARE, FREE DOES NOT CALL CLOSE!
 void _dpx_duplex_conn_close(dpx_duplex_conn *c);
-dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd);
+dpx_duplex_conn* _dpx_duplex_conn_new(dpx_peer *p, int fd, uuid_t *uuid);
 
 void _dpx_duplex_conn_read_frames(void *v);
 void _dpx_duplex_conn_write_frames(dpx_duplex_conn *c);
 DPX_ERROR _dpx_duplex_conn_write_frame(dpx_duplex_conn *c, dpx_frame *frame);
 void _dpx_duplex_conn_link_channel(dpx_duplex_conn *c, dpx_channel* ch);
 void _dpx_duplex_conn_unlink_channel(dpx_duplex_conn *c, dpx_channel* ch);
+
+char* _dpx_duplex_conn_name(dpx_duplex_conn *c);
 
 // --------------------------- { alchan } -------------------------------------
 #define ALCHAN_NONE -1

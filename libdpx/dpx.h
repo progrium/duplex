@@ -62,6 +62,10 @@ DPX_ERROR dpx_peer_bind(dpx_peer *p, char* addr, int port);
 
 // properties
 int dpx_peer_closed(dpx_peer *p); // check if peer is closed
+char* dpx_peer_name(dpx_peer *p); // get peer name
+
+//int dpx_peer_remote_len(dpx_peer *p); // get number of remote peers
+//void dpx_peer_remote_iter(dpx_peer *p, void (*iter_func)(void* arg, char* name), void* arg);
 
 // ------------------------------- { channels } -------------------------------
 
@@ -78,6 +82,7 @@ DPX_ERROR dpx_channel_send_frame(dpx_channel *c, dpx_frame *frame);
 char* dpx_channel_method_get(dpx_channel *c); // returns method
 char* dpx_channel_method_set(dpx_channel *c, char* method); // returns old one
 int dpx_channel_closed(dpx_channel *c); // check if channel is closed
+char* dpx_channel_peer(dpx_channel *c); // retrieve UUID in STRING format
 
 // -------------------------------- { frames } --------------------------------
 #define DPX_FRAME_OPEN 0

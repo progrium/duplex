@@ -213,6 +213,33 @@ START_TEST(test_dpx_peer_frame_send_receive) {
 	dpx_cleanup();
 } END_TEST
 
+START_TEST(test_dpx_peer_names) {
+	dpx_init();
+
+	dpx_peer* p1 = dpx_peer_new();
+	dpx_peer* p2 = dpx_peer_new();
+
+	ck_assert_msg(dpx_peer_bind(p1, "127.0.0.1", 9872) == DPX_ERROR_NONE, "Error encountered trying to bind.");
+	ck_assert_msg(dpx_peer_connect(p2, "127.0.0.1", 9872) == DPX_ERROR_NONE, "Error encountered trying to connect.");
+
+	dpx_channel* client_chan = dpx_peer_open(p1, "foobar");
+	dpx_channel* server_chan = dpx_peer_accept(p2);
+
+	ck_assert_str_eq(dpx_channel_peer(client_chan), dpx_peer_name(p2));
+	ck_assert_str_eq(dpx_channel_peer(server_chan), dpx_peer_name(p1));
+
+	dpx_channel_free(client_chan);
+	dpx_channel_free(server_chan);
+
+	dpx_peer_close(p1);
+	dpx_peer_close(p2);
+
+	dpx_peer_free(p1);
+	dpx_peer_free(p2);
+
+	dpx_cleanup();
+} END_TEST
+
 // WARNING: does not free orig
 char* test_dpx_reverse(char* orig, int size) {
 	char* ret = malloc(size);
@@ -506,6 +533,7 @@ dpx_suite_core(void)
 	suite_add_tcase(s, tc_core);
 
 	TCase *tc_peer = tcase_create("Peer Functions");
+	tcase_add_test(tc_peer, test_dpx_peer_names);
 	tcase_add_test(tc_peer, test_dpx_peer_frame_send_receive);
 	tcase_add_test(tc_peer, test_dpx_rpc_call);
 
