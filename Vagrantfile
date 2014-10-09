@@ -5,6 +5,9 @@
 VAGRANTFILE_API_VERSION = "2"
 
 $script = <<SCRIPT
+
+goVersion="go1.3.3"
+
 echo "Provisioning Vagrant VM"
 
 echo "Running updates"
@@ -18,7 +21,7 @@ echo "Installing msgpack"
 sudo apt-get install libmsgpack-dev -y
 
 echo "Installing python dev env"
-sudo apt-get install python-dev python-setuptools -y
+sudo apt-get install python-dev python-setuptools python-virtualenv -y
 
 echo "Installing check"
 sudo apt-get install check -y
@@ -26,8 +29,11 @@ sudo apt-get install check -y
 echo "Installing golang"
 bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 source ~/.gvm/scripts/gvm
-gvm install go1.3.3
-gvm use go1.3.3 --default
+gvm install $goVersion
+gvm use $goVersion --default
+mkdir -pv ~/.gvm/pkgsets/${goVersion}/global/src/github.com/progrium
+ln -sv /vagrant ~/.gvm/pkgsets/${goVersion}/global/src/github.com/progrium/duplex
+
 
 echo "Finished provisioning."
 SCRIPT

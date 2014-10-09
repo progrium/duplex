@@ -6,7 +6,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/robxu9/duplex/bindings/go-duplex/dpx"
+	"github.com/progrium/duplex/bindings/go-duplex/dpx"
 )
 
 type Call struct {
