@@ -7,7 +7,7 @@ STATIC=$(NAME).a
 DESTDIR ?=
 PREFIX ?= /usr/local
 
-all: vendor $(STATIC) $(SHARED)
+all: vendor/.libs $(STATIC) $(SHARED)
 
 OFILES=\
 	alchan.o\
@@ -36,16 +36,16 @@ ifeq ($(ARCH), x86_64)
 	OUR_CFLAGS += -fPIC
 endif
 
-vendor:
+vendor/.libs:
 	$(MAKE) -C vendor all
 
 %.o: %.c
 	$(CC) -c $*.c $(OUR_CFLAGS)
 
-$(SHARED): vendor $(OFILES)
+$(SHARED): vendor/.libs $(OFILES)
 	$(CC) -shared -o $(SHARED) $(OFILES) $(OUR_LDFLAGS) 
 
-$(STATIC): vendor $(OFILES)
+$(STATIC): vendor/.libs $(OFILES)
 	ar rcs $(STATIC) $(OFILES)
 
 clean:
