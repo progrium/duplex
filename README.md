@@ -36,13 +36,13 @@ Seems to work (tm).
 
 The basic workflow for using `dpx-c` is the following:
 
-* Initialise a worker context, so that all operations happen on the worker thread: `dpx_context *c = dpx_init();`
-* Initialise a peer that will utilise that context: `dpx_peer *p = dpx_peer_new(c);`
-* Use happily and/or report lots of bugs.
+* Initialise the worker thread by calling `dpx_init()`. All operations work on this thread, so the API is fully threadsafe.
+* Initialise a peer: `dpx_peer *p = dpx_peer_new();`
+* Terminate the worker thread by calling `dpx_cleanup()`.
+* Use happily and/or report lots of bugs. Preferably report lots of bugs, because I'm damn sure it's not complete.
 
 #### Requirements:
 
-* [libtask](https://github.com/robxu9/duplex/tree/master/vendor/libtask)
 * [msgpack-c](https://github.com/msgpack/msgpack-c)
 * For testing: [check](http://check.sourceforge.net)
 
@@ -51,7 +51,7 @@ Compile with `make`, test with `make check`, install with `make install`.
 
 #### Troubles:
 
-* bindings may not cleanup the socket left in `/tmp/dpxc_*`. Not really troublesome, but it can pile up.
+* bindings may not cleanup the socket left in `/tmp/dpxc_*`. Currently investigating a solution which doesn't expose the socket at all (socketpair()).
 
 ### Bindings around libdpx (bindings)
 
@@ -97,8 +97,6 @@ As far as the Duplex protocol is concerned, the payload of messages is just a ba
 
 Duplex does not concern itself with what types of objects it supports and does not invent a new serialization scheme. Instead, it can let you plugin whatever you want, existing or custom.
 
-**Current PoC implementation just uses msgpack**
-
 ### Extensibility
 
 Besides codecs, you can extend Duplex frames with extra metadata in the same way you can HTTP requests using key-value headers. This metadata can be used by your own custom infrastructure for advanced routing or tracing, without affecting the actual RPC payloads. Headers are also used for advanced RPC semantics borrowed from BERT-RPC, such as caching and callbacks.
@@ -113,11 +111,12 @@ Because Duplex peers are symmetrical, there is no technical distinction of clien
 
 Like ZeroMQ devices, Duplex provides tools to let you build middleman "proxy" services. Using the metadata of headers, similar to HTTP proxies, you can customize routing and add features like authentication or rate limiting, without touching the RPC payloads. This is somewhat similar to Filters in Twitter Finagle.
 
-One "trick" we've been thinking about in tandem with our service discovery system, is allowing a middleman service to insert itself into the path of RPC connections via service discovery hooks. This would allow you to transparently insert and remove RPC proxy services to log traffic, add tracing, split requests, etc. 
+One "trick" we've been thinking about in tandem with our service discovery system, is allowing a middleman service to insert itself into the path of RPC connections via service discovery hooks. This would allow you to transparently insert and remove RPC proxy services to log traffic, add tracing, split requests, etc.
 
 ## Thanks to
 
-[Jeff Lindsay](https://github.com/progrium), my awesome mentor at DigitalOcean.
+* [Jeff Lindsay](https://github.com/progrium), my extremely awesome mentor who radiates awesomeness everywhere! (This may have been typed up at 1am. In all seriousness, I hope to continue working with you in the future.)
+* [DigitalOcean](http://www.digitalocean.com), who sponsored my summer internship in 2014 and my work on this project, among other things. They are a really really really really great bunch of people!
 
 ## License
 
