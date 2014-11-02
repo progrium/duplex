@@ -6,7 +6,7 @@ import (
 	"log"
 	"reflect"
 
-	"./dpx"
+	"github.com/progrium/duplex/prototype/dpx"
 )
 
 type Call struct {

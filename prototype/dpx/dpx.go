@@ -41,6 +41,14 @@ func Close(peer *Peer) error {
 	return peer.Close()
 }
 
+func Name(peer *Peer) string {
+	return peer.Name()
+}
+
+func Remote(peer *Peer) []string {
+	return peer.Remote()
+}
+
 func Codec(peer *Peer, name string, codec interface{}) error {
 	return nil // TODO
 }

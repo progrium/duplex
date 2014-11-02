@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"sync"
 
-	"./dpx"
+	"github.com/progrium/duplex/prototype/dpx"
 )
 
 type Peer struct {
@@ -33,6 +33,14 @@ func (p *Peer) Connect(addr string) error {
 
 func (p *Peer) Close() error {
 	return dpx.Close(p.P)
+}
+
+func (p *Peer) Name() string {
+	return dpx.Name(p.P)
+}
+
+func (p *Peer) Remote() []string {
+	return dpx.Remote(p.P)
 }
 
 func (p *Peer) Accept() (string, *Channel) {
