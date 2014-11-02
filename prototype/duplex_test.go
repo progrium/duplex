@@ -117,6 +117,44 @@ func TestAsyncCall(t *testing.T) {
 	}
 }
 
+func TestClientCloseThenConnect(t *testing.T) {
+	peer1 := NewPeer()
+	if err := peer1.Bind("127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	defer peer1.Close()
+
+	peer1.Register(new(Arith))
+	go peer1.Serve()
+
+	peer2 := NewPeer()
+	if err := peer2.Connect("127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	// defer peer2.Close()
+
+	args := &Args{7, 8}
+	reply := new(Reply)
+	peer2.Call("Arith.Add", args, reply)
+
+	// Close peer2
+	peer2.Close()
+
+	// Create a new peer.
+	peer3 := NewPeer()
+	if err := peer3.Connect("127.0.0.1:9876"); err != nil {
+		t.Fatal(err)
+	}
+	defer peer3.Close()
+
+	err := peer3.Call("Arith.Add", args, reply)
+	if err != nil {
+		t.Fatalf("Add: expected no error but got string %q", err.Error())
+	}
+	if reply.C != args.A+args.B {
+		t.Fatalf("Add: expected %d got %d", reply.C, args.A+args.B)
+	}
+}
 func TestCommonErrors(t *testing.T) {
 	client, server := makePair(t)
 	defer client.Close()
