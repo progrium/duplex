@@ -41,11 +41,11 @@ func (p *Peer) Bind(addr string) error {
 	var l Listener
 	switch u.Scheme {
 	case "tcp":
-		l, err := newSSHListener(p, "tcp", u.Host)
+		l, err = newSSHListener(p, "tcp", u.Host)
 	case "unix":
-		l, err := newSSHListener(p, "unix", u.Path)
+		l, err = newSSHListener(p, "unix", u.Path)
 	case "inproc":
-		l, err := newInprocListener(p, u.Host)
+		l, err = newInprocListener(p, u.Host)
 	default:
 		return errors.New("duplex: unknown address type: " + u.Scheme)
 	}
@@ -70,6 +70,7 @@ func (p *Peer) Unbind(addr string) error {
 	if err != nil {
 		return err
 	}
+	return nil
 }
 
 func (p *Peer) Connect(addr string) error {
@@ -80,11 +81,11 @@ func (p *Peer) Connect(addr string) error {
 	var c Connection
 	switch u.Scheme {
 	case "tcp":
-		c, err := newSSHConnection(p, "tcp", u.Host)
+		c, err = newSSHConnection(p, "tcp", u.Host)
 	case "unix":
-		c, err := newSSHConnection(p, "unix", u.Path)
+		c, err = newSSHConnection(p, "unix", u.Path)
 	case "inproc":
-		c, err := newInprocConnection(p, u.Host)
+		c, err = newInprocConnection(p, u.Host)
 	default:
 		return errors.New("duplex: unknown address type: " + u.Scheme)
 	}
@@ -109,6 +110,7 @@ func (p *Peer) Disconnect(addr string) error {
 	if err != nil {
 		return err
 	}
+	return nil
 }
 
 func (p *Peer) lookupConnection(peer string) Connection {
@@ -188,7 +190,7 @@ func (p *Peer) Accept(chType string) (ChannelMeta, Channel) {
 
 func (p *Peer) Open(chType, peer, service string, headers []string) (Channel, error) {
 	c := p.lookupConnection(peer)
-	if conn != nil {
+	if c != nil {
 		return c.Open(chType, service, headers)
 	}
 	return nil, errors.New("duplex: remote peer not connected: " + peer)

@@ -10,7 +10,7 @@ import (
 	"github.com/progrium/crypto/ssh"
 )
 
-func newSSHListener(typ, addr string, peer *Peer) (Listener, error) {
+func newSSHListener(peer *Peer, typ, addr string) (Listener, error) {
 	pem, err := ioutil.ReadFile(peer.GetOption(OptPrivateKey))
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func newSSHListener(typ, addr string, peer *Peer) (Listener, error) {
 				peer.Unbind(typ + "://" + addr)
 				return
 			}
-			go handleSSHConnection(conn, config)
+			go handleSSHConn(conn, config)
 		}
 	}()
 	return &sshListener{listener}, nil
@@ -70,7 +70,7 @@ func handleSSHConn(conn net.Conn, config *ssh.ServerConfig) {
 	}
 }
 
-func newSSHConnection(typ, addr string, peer *Peer) (Connection, error) {
+func newSSHConnection(peer *Peer, typ, addr string) (Connection, error) {
 	pem, err := ioutil.ReadFile(peer.GetOption(OptPrivateKey))
 	if err != nil {
 		return nil, err
