@@ -12,7 +12,7 @@ func main() {
 	peer1 := duplex.NewPeer()
 	peer1.SetOption(duplex.OptPrivateKey, "~/.ssh/id_rsa")
 	peer1.SetOption(duplex.OptName, "peer1")
-	err := peer1.Bind("tcp://0.0.0.0:2222")
+	err := peer1.Bind("unix:///tmp/foo")
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +36,7 @@ func main() {
 	peer2 := duplex.NewPeer()
 	peer2.SetOption(duplex.OptPrivateKey, "~/.ssh/id_rsa")
 	peer2.SetOption(duplex.OptName, "peer2")
-	err = peer2.Connect("tcp://0.0.0.0:2222")
+	err = peer2.Connect("unix:///tmp/foo")
 	if err != nil {
 		panic(err)
 	}
