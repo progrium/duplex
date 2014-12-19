@@ -4,10 +4,10 @@ import (
 	"errors"
 )
 
-func newInprocListener(peer *Peer, addr string) (Listener, error) {
+func newPeerListener_inproc(peer *Peer, addr string) (peerListener, error) {
 	return nil, errors.New("not implemented")
 }
 
-func newInprocConnection(peer *Peer, addr string) (Connection, error) {
+func newPeerConnection_inproc(peer *Peer, addr string) (peerConnection, error) {
 	return nil, errors.New("not implemented")
 }

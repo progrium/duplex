@@ -7,29 +7,25 @@ import (
 )
 
 const (
-	Frames = "@duplex-frames"
-	Stream = "@duplex-stream"
-
 	OptPrivateKey = "privatekey"
+	OptName       = "name"
 )
 
 type Peer struct {
 	sync.Mutex
-	options         map[string]string
-	conns           map[string]Connection
-	binds           map[string]Listener
-	pendingFramesCh chan interface{}
-	pendingStreamCh chan interface{}
-	shutdown        bool
+	options    map[string]string
+	conns      map[string]peerConnection
+	binds      map[string]peerListener
+	incomingCh chan interface{}
+	shutdown   bool
 }
 
 func NewPeer() *Peer {
 	return &Peer{
-		options:         make(map[string]string),
-		conns:           make(map[string]Connection),
-		binds:           make(map[string]Listener),
-		pendingFramesCh: make(chan interface{}, 1024),
-		pendingStreamCh: make(chan interface{}, 1024),
+		options:    make(map[string]string),
+		conns:      make(map[string]peerConnection),
+		binds:      make(map[string]peerListener),
+		incomingCh: make(chan interface{}, 1024),
 	}
 }
 
@@ -38,14 +34,14 @@ func (p *Peer) Bind(addr string) error {
 	if err != nil {
 		return err
 	}
-	var l Listener
+	var l peerListener
 	switch u.Scheme {
 	case "tcp":
-		l, err = newSSHListener(p, "tcp", u.Host)
+		l, err = newPeerListener_ssh(p, "tcp", u.Host)
 	case "unix":
-		l, err = newSSHListener(p, "unix", u.Path)
+		l, err = newPeerListener_ssh(p, "unix", u.Path)
 	case "inproc":
-		l, err = newInprocListener(p, u.Host)
+		l, err = newPeerListener_inproc(p, u.Host)
 	default:
 		return errors.New("duplex: unknown address type: " + u.Scheme)
 	}
@@ -78,14 +74,14 @@ func (p *Peer) Connect(addr string) error {
 	if err != nil {
 		return err
 	}
-	var c Connection
+	var c peerConnection
 	switch u.Scheme {
 	case "tcp":
-		c, err = newSSHConnection(p, "tcp", u.Host)
+		c, err = newPeerConnection_ssh(p, "tcp", u.Host)
 	case "unix":
-		c, err = newSSHConnection(p, "unix", u.Path)
+		c, err = newPeerConnection_ssh(p, "unix", u.Path)
 	case "inproc":
-		c, err = newInprocConnection(p, u.Host)
+		c, err = newPeerConnection_inproc(p, u.Host)
 	default:
 		return errors.New("duplex: unknown address type: " + u.Scheme)
 	}
@@ -113,7 +109,7 @@ func (p *Peer) Disconnect(addr string) error {
 	return nil
 }
 
-func (p *Peer) lookupConnection(peer string) Connection {
+func (p *Peer) lookupConnection(peer string) peerConnection {
 	p.Lock()
 	defer p.Unlock()
 	for _, c := range p.conns {
@@ -175,23 +171,15 @@ func (p *Peer) Shutdown() error {
 	return nil
 }
 
-func (p *Peer) Accept(chType string) (ChannelMeta, Channel) {
-	switch chType {
-	case Frames:
-		c := <-p.pendingFramesCh
-		return c.(ChannelMeta), c.(Channel)
-	case Stream:
-		c := <-p.pendingStreamCh
-		return c.(ChannelMeta), c.(Channel)
-	default:
-		return nil, nil
-	}
+func (p *Peer) Accept() (ChannelMeta, Channel) {
+	c := <-p.incomingCh
+	return c.(ChannelMeta), c.(Channel)
 }
 
-func (p *Peer) Open(chType, peer, service string, headers []string) (Channel, error) {
+func (p *Peer) Open(peer, service string, headers []string) (Channel, error) {
 	c := p.lookupConnection(peer)
 	if c != nil {
-		return c.Open(chType, service, headers)
+		return c.Open(service, headers)
 	}
 	return nil, errors.New("duplex: remote peer not connected: " + peer)
 }
