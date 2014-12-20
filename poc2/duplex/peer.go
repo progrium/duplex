@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net/url"
 	"sync"
+
+	"code.google.com/p/go-uuid/uuid"
 )
 
 const (
@@ -22,7 +24,10 @@ type Peer struct {
 
 func NewPeer() *Peer {
 	return &Peer{
-		options:    make(map[string]string),
+		options: map[string]string{
+			OptPrivateKey: "~/.ssh/id_rsa",
+			OptName:       uuid.New(),
+		},
 		conns:      make(map[string]peerConnection),
 		binds:      make(map[string]peerListener),
 		incomingCh: make(chan interface{}, 1024),
