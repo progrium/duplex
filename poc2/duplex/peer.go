@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	OptPrivateKey = "privatekey"
-	OptName       = "name"
+	OptPrivateKey     = "privatekey"
+	OptAuthorizedKeys = "authorizedkeys"
+	OptName           = "name"
 )
 
 type Peer struct {
@@ -25,8 +26,9 @@ type Peer struct {
 func NewPeer() *Peer {
 	return &Peer{
 		options: map[string]string{
-			OptPrivateKey: "~/.ssh/id_rsa",
-			OptName:       uuid.New(),
+			OptPrivateKey:     "~/.ssh/id_rsa",
+			OptAuthorizedKeys: "~/.ssh/authorized_keys",
+			OptName:           uuid.New(),
 		},
 		conns:      make(map[string]peerConnection),
 		binds:      make(map[string]peerListener),

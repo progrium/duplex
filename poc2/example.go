@@ -9,9 +9,15 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Not enough args")
+		os.Exit(2)
+	}
+	uri := os.Args[1]
+
 	peer1 := duplex.NewPeer()
 	peer1.SetOption(duplex.OptName, "peer1")
-	err := peer1.Bind("inproc://foobar")
+	err := peer1.Bind(uri)
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +40,7 @@ func main() {
 
 	peer2 := duplex.NewPeer()
 	peer2.SetOption(duplex.OptName, "peer2")
-	err = peer2.Connect("inproc://foobar")
+	err = peer2.Connect(uri)
 	if err != nil {
 		panic(err)
 	}

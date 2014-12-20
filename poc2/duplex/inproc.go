@@ -9,26 +9,26 @@ var inproc_listeners = make(map[string]*Peer)
 
 // inproc connection
 
-type peerConnection_inproc struct {
+type inproc_peerConnection struct {
 	identifier string
 	name       string
 	remote     *Peer
 }
 
-func (c *peerConnection_inproc) Disconnect() error {
+func (c *inproc_peerConnection) Disconnect() error {
 	// TODO close all channels
 	return nil
 }
 
-func (c *peerConnection_inproc) Name() string {
+func (c *inproc_peerConnection) Name() string {
 	return c.name
 }
 
-func (c *peerConnection_inproc) Addr() string {
+func (c *inproc_peerConnection) Addr() string {
 	return "inproc://" + c.identifier
 }
 
-func (c *peerConnection_inproc) Open(service string, headers []string) (Channel, error) {
+func (c *inproc_peerConnection) Open(service string, headers []string) (Channel, error) {
 	ch := &inproc_opened_ch{
 		service:   service,
 		headers:   headers,
@@ -45,13 +45,13 @@ func newPeerConnection_inproc(peer *Peer, identifier string) (peerConnection, er
 		return nil, errors.New("no peer listening with this identifier: " + identifier)
 	}
 	remote.Lock()
-	remote.conns["inproc://"+identifier] = &peerConnection_inproc{
+	remote.conns["inproc://"+identifier] = &inproc_peerConnection{
 		identifier: identifier,
 		remote:     peer,
 		name:       peer.GetOption(OptName),
 	}
 	remote.Unlock()
-	return &peerConnection_inproc{
+	return &inproc_peerConnection{
 		identifier: identifier,
 		remote:     remote,
 		name:       remote.GetOption(OptName),
@@ -60,11 +60,11 @@ func newPeerConnection_inproc(peer *Peer, identifier string) (peerConnection, er
 
 // inproc listener
 
-type peerListener_inproc struct {
+type inproc_peerListener struct {
 	identifier string
 }
 
-func (l *peerListener_inproc) Unbind() error {
+func (l *inproc_peerListener) Unbind() error {
 	delete(inproc_listeners, l.identifier)
 	return nil
 }
@@ -75,7 +75,7 @@ func newPeerListener_inproc(peer *Peer, identifier string) (peerListener, error)
 		return nil, errors.New("peer already listening with identifier: " + identifier)
 	}
 	inproc_listeners[identifier] = peer
-	return &peerListener_inproc{identifier}, nil
+	return &inproc_peerListener{identifier}, nil
 }
 
 // channels

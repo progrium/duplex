@@ -41,35 +41,35 @@ type ssh_channelData struct {
 
 // ssh listener
 
-type peerListener_ssh struct {
+type ssh_peerListener struct {
 	net.Listener
 }
 
-func (l *peerListener_ssh) Unbind() error {
+func (l *ssh_peerListener) Unbind() error {
 	return l.Close()
 }
 
 // ssh connection
 
-type peerConnection_ssh struct {
+type ssh_peerConnection struct {
 	addr string
 	name string
 	conn ssh.Conn
 }
 
-func (c *peerConnection_ssh) Disconnect() error {
+func (c *ssh_peerConnection) Disconnect() error {
 	return c.conn.Close()
 }
 
-func (c *peerConnection_ssh) Name() string {
+func (c *ssh_peerConnection) Name() string {
 	return c.name
 }
 
-func (c *peerConnection_ssh) Addr() string {
+func (c *ssh_peerConnection) Addr() string {
 	return c.addr
 }
 
-func (c *peerConnection_ssh) Open(service string, headers []string) (Channel, error) {
+func (c *ssh_peerConnection) Open(service string, headers []string) (Channel, error) {
 	meta := ssh_channelData{
 		Service: service,
 		Headers: headers,
@@ -79,7 +79,7 @@ func (c *peerConnection_ssh) Open(service string, headers []string) (Channel, er
 		return nil, err
 	}
 	go ssh.DiscardRequests(reqs)
-	return &channel_ssh{ch, meta}, nil
+	return &ssh_channel{ch, meta}, nil
 }
 
 // ssh server
@@ -116,7 +116,7 @@ func newPeerListener_ssh(peer *Peer, typ, addr string) (peerListener, error) {
 			go ssh_handleConn(conn, config, peer)
 		}
 	}()
-	return &peerListener_ssh{listener}, nil
+	return &ssh_peerListener{listener}, nil
 }
 
 func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
@@ -128,7 +128,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 	}
 	go ssh.DiscardRequests(reqs)
 	peer.Lock()
-	peer.conns[conn.RemoteAddr().String()] = &peerConnection_ssh{
+	peer.conns[conn.RemoteAddr().String()] = &ssh_peerConnection{
 		addr: conn.RemoteAddr().Network() + "://" + conn.RemoteAddr().String(),
 		name: sshConn.User(),
 		conn: sshConn,
@@ -183,7 +183,7 @@ func newPeerConnection_ssh(peer *Peer, network, addr string) (peerConnection, er
 	}()
 	name := <-nameCh // todo: timeout nameCh
 	go ssh_acceptChannels(chans, peer)
-	return &peerConnection_ssh{
+	return &ssh_peerConnection{
 		addr: network + "://" + addr,
 		name: name,
 		conn: conn,
@@ -192,12 +192,12 @@ func newPeerConnection_ssh(peer *Peer, network, addr string) (peerConnection, er
 
 // channels
 
-type channel_ssh struct {
+type ssh_channel struct {
 	ssh.Channel
 	ssh_channelData
 }
 
-func (c *channel_ssh) ReadFrame() ([]byte, error) {
+func (c *ssh_channel) ReadFrame() ([]byte, error) {
 	bytes := make([]byte, 4)
 	_, err := c.Read(bytes)
 	if err != nil {
@@ -213,7 +213,7 @@ func (c *channel_ssh) ReadFrame() ([]byte, error) {
 	return frame, nil
 }
 
-func (c *channel_ssh) WriteFrame(frame []byte) error {
+func (c *ssh_channel) WriteFrame(frame []byte) error {
 	var buffer []byte
 	n := uint32(len(frame))
 	buffer = append(buffer, byte(n>>24), byte(n>>16), byte(n>>8), byte(n))
@@ -222,11 +222,11 @@ func (c *channel_ssh) WriteFrame(frame []byte) error {
 	return err
 }
 
-func (c *channel_ssh) Headers() []string {
+func (c *ssh_channel) Headers() []string {
 	return c.ssh_channelData.Headers
 }
 
-func (c *channel_ssh) Service() string {
+func (c *ssh_channel) Service() string {
 	return c.ssh_channelData.Service
 }
 
@@ -251,7 +251,7 @@ func ssh_acceptChannels(chans <-chan ssh.NewChannel, peer *Peer) {
 					return
 				}
 				go ssh.DiscardRequests(reqs)
-				peer.incomingCh <- &channel_ssh{ch, meta}
+				peer.incomingCh <- &ssh_channel{ch, meta}
 			}()
 		}
 	}
