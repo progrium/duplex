@@ -29,7 +29,7 @@ type ChannelMeta interface {
 type peerConnection interface {
 	Disconnect() error
 	Name() string
-	Addr() string
+	Endpoint() string
 	Open(service string, headers []string) (Channel, error)
 }
 

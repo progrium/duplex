@@ -3,6 +3,7 @@ package duplex
 import (
 	"bytes"
 	"errors"
+	"net/url"
 )
 
 var inproc_listeners = make(map[string]*Peer)
@@ -17,6 +18,9 @@ type inproc_peerConnection struct {
 
 func (c *inproc_peerConnection) Disconnect() error {
 	// TODO close all channels
+	c.remote.Lock()
+	delete(c.remote.conns, "inproc://"+c.identifier)
+	c.remote.Unlock()
 	return nil
 }
 
@@ -24,7 +28,7 @@ func (c *inproc_peerConnection) Name() string {
 	return c.name
 }
 
-func (c *inproc_peerConnection) Addr() string {
+func (c *inproc_peerConnection) Endpoint() string {
 	return "inproc://" + c.identifier
 }
 
@@ -39,7 +43,8 @@ func (c *inproc_peerConnection) Open(service string, headers []string) (Channel,
 	return ch, nil
 }
 
-func newPeerConnection_inproc(peer *Peer, identifier string) (peerConnection, error) {
+func newPeerConnection_inproc(peer *Peer, u *url.URL) (peerConnection, error) {
+	identifier := u.Host
 	remote, ok := inproc_listeners[identifier]
 	if !ok {
 		return nil, errors.New("no peer listening with this identifier: " + identifier)
@@ -69,7 +74,8 @@ func (l *inproc_peerListener) Unbind() error {
 	return nil
 }
 
-func newPeerListener_inproc(peer *Peer, identifier string) (peerListener, error) {
+func newPeerListener_inproc(peer *Peer, u *url.URL) (peerListener, error) {
+	identifier := u.Host
 	_, exists := inproc_listeners[identifier]
 	if exists {
 		return nil, errors.New("peer already listening with identifier: " + identifier)

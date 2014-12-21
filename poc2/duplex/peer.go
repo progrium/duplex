@@ -3,6 +3,7 @@ package duplex
 import (
 	"errors"
 	"net/url"
+	"sort"
 	"sync"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -21,6 +22,7 @@ type Peer struct {
 	binds      map[string]peerListener
 	incomingCh chan interface{}
 	shutdown   bool
+	rrIndex    int
 }
 
 func NewPeer() *Peer {
@@ -36,39 +38,39 @@ func NewPeer() *Peer {
 	}
 }
 
-func (p *Peer) Bind(addr string) error {
-	u, err := url.Parse(addr)
+func (p *Peer) Bind(endpoint string) error {
+	u, err := url.Parse(endpoint)
 	if err != nil {
 		return err
 	}
 	var l peerListener
 	switch u.Scheme {
 	case "tcp":
-		l, err = newPeerListener_ssh(p, "tcp", u.Host)
+		l, err = newPeerListener_ssh(p, u)
 	case "unix":
-		l, err = newPeerListener_ssh(p, "unix", u.Path)
+		l, err = newPeerListener_ssh(p, u)
 	case "inproc":
-		l, err = newPeerListener_inproc(p, u.Host)
+		l, err = newPeerListener_inproc(p, u)
 	default:
-		return errors.New("duplex: unknown address type: " + u.Scheme)
+		return errors.New("duplex: unknown endpoint type: " + u.Scheme)
 	}
 	if err != nil {
 		return err
 	}
 	p.Lock()
-	p.binds[addr] = l
+	p.binds[endpoint] = l
 	p.Unlock()
 	return nil
 }
 
-func (p *Peer) Unbind(addr string) error {
+func (p *Peer) Unbind(endpoint string) error {
 	p.Lock()
 	defer p.Unlock()
-	l, ok := p.binds[addr]
+	l, ok := p.binds[endpoint]
 	if !ok {
-		return errors.New("duplex: no listener for: " + addr)
+		return errors.New("duplex: no listener for: " + endpoint)
 	}
-	delete(p.binds, addr)
+	delete(p.binds, endpoint)
 	err := l.Unbind()
 	if err != nil {
 		return err
@@ -76,39 +78,39 @@ func (p *Peer) Unbind(addr string) error {
 	return nil
 }
 
-func (p *Peer) Connect(addr string) error {
-	u, err := url.Parse(addr)
+func (p *Peer) Connect(endpoint string) error {
+	u, err := url.Parse(endpoint)
 	if err != nil {
 		return err
 	}
 	var c peerConnection
 	switch u.Scheme {
 	case "tcp":
-		c, err = newPeerConnection_ssh(p, "tcp", u.Host)
+		c, err = newPeerConnection_ssh(p, u)
 	case "unix":
-		c, err = newPeerConnection_ssh(p, "unix", u.Path)
+		c, err = newPeerConnection_ssh(p, u)
 	case "inproc":
-		c, err = newPeerConnection_inproc(p, u.Host)
+		c, err = newPeerConnection_inproc(p, u)
 	default:
-		return errors.New("duplex: unknown address type: " + u.Scheme)
+		return errors.New("duplex: unknown endpoint type: " + u.Scheme)
 	}
 	if err != nil {
 		return err
 	}
 	p.Lock()
-	p.conns[addr] = c
+	p.conns[endpoint] = c
 	p.Unlock()
 	return nil
 }
 
-func (p *Peer) Disconnect(addr string) error {
+func (p *Peer) Disconnect(endpoint string) error {
 	p.Lock()
 	defer p.Unlock()
-	c, ok := p.conns[addr]
+	c, ok := p.conns[endpoint]
 	if !ok {
-		return errors.New("duplex: no connection for: " + addr)
+		return errors.New("duplex: no connection for: " + endpoint)
 	}
-	delete(p.conns, addr)
+	delete(p.conns, endpoint)
 	err := c.Disconnect()
 	if err != nil {
 		return err
@@ -130,18 +132,31 @@ func (p *Peer) lookupConnection(peer string) peerConnection {
 func (p *Peer) Drop(peer string) error {
 	conn := p.lookupConnection(peer)
 	if conn != nil {
-		return p.Disconnect(conn.Addr())
+		return p.Disconnect(conn.Endpoint())
 	}
 	return errors.New("duplex: remote peer not connected: " + peer)
 }
 
 func (p *Peer) Peers() []string {
+	p.Lock()
+	defer p.Unlock()
 	peers := make([]string, 0)
 	for _, c := range p.conns {
 		peers = append(peers, c.Name())
 	}
-
+	sort.Strings(peers)
 	return peers
+}
+
+func (p *Peer) NextPeer() (string, error) {
+	peers := p.Peers()
+	if len(peers) == 0 {
+		return "", errors.New("no peers connected")
+	}
+	p.Lock()
+	p.rrIndex += 1
+	p.Unlock()
+	return peers[p.rrIndex%len(peers)], nil
 }
 
 func (p *Peer) SetOption(name, value string) error {

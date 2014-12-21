@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"os/user"
 	"strings"
@@ -52,9 +53,9 @@ func (l *ssh_peerListener) Unbind() error {
 // ssh connection
 
 type ssh_peerConnection struct {
-	addr string
-	name string
-	conn ssh.Conn
+	endpoint string
+	name     string
+	conn     ssh.Conn
 }
 
 func (c *ssh_peerConnection) Disconnect() error {
@@ -65,8 +66,8 @@ func (c *ssh_peerConnection) Name() string {
 	return c.name
 }
 
-func (c *ssh_peerConnection) Addr() string {
-	return c.addr
+func (c *ssh_peerConnection) Endpoint() string {
+	return c.endpoint
 }
 
 func (c *ssh_peerConnection) Open(service string, headers []string) (Channel, error) {
@@ -84,7 +85,7 @@ func (c *ssh_peerConnection) Open(service string, headers []string) (Channel, er
 
 // ssh server
 
-func newPeerListener_ssh(peer *Peer, typ, addr string) (peerListener, error) {
+func newPeerListener_ssh(peer *Peer, u *url.URL) (peerListener, error) {
 	pk, err := loadPrivateKey(peer.GetOption(OptPrivateKey))
 	if err != nil {
 		return nil, err
@@ -99,10 +100,13 @@ func newPeerListener_ssh(peer *Peer, typ, addr string) (peerListener, error) {
 	}
 	config.AddHostKey(pk)
 
-	if typ == "unix" {
-		os.Remove(addr)
+	var listener net.Listener
+	if u.Scheme == "unix" {
+		os.Remove(u.Path)
+		listener, err = net.Listen(u.Scheme, u.Path)
+	} else {
+		listener, err = net.Listen(u.Scheme, u.Host)
 	}
-	listener, err := net.Listen(typ, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +114,7 @@ func newPeerListener_ssh(peer *Peer, typ, addr string) (peerListener, error) {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				peer.Unbind(typ + "://" + addr)
+				peer.Unbind(u.String())
 				return
 			}
 			go ssh_handleConn(conn, config, peer)
@@ -126,14 +130,25 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 		log.Println("debug: failed to handshake:", err)
 		return
 	}
-	go ssh.DiscardRequests(reqs)
+	endpoint := conn.RemoteAddr().Network() + "://" + conn.RemoteAddr().String()
+	if conn.RemoteAddr().Network() == "unix" && conn.RemoteAddr().String() == "" {
+		// is it normal to not have a remote address with unix sockets?
+		// because we need a unique endpoint for peer.conns, we use the
+		// peer name when we don't have a remote address.
+		endpoint = conn.RemoteAddr().Network() + "://" + sshConn.User()
+	}
 	peer.Lock()
-	peer.conns[conn.RemoteAddr().String()] = &ssh_peerConnection{
-		addr: conn.RemoteAddr().Network() + "://" + conn.RemoteAddr().String(),
-		name: sshConn.User(),
-		conn: sshConn,
+	peer.conns[endpoint] = &ssh_peerConnection{
+		endpoint: endpoint,
+		name:     sshConn.User(),
+		conn:     sshConn,
 	}
 	peer.Unlock()
+	/*go func() {
+		sshConn.Wait()
+		log.Println(peer.Disconnect(endpoint))
+	}()*/
+	go ssh.DiscardRequests(reqs)
 	ok, _, err := sshConn.SendRequest("@duplex-greeting", true,
 		ssh.Marshal(&ssh_greetingPayload{peer.GetOption(OptName)}))
 	if err != nil || !ok {
@@ -145,7 +160,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 
 // ssh client
 
-func newPeerConnection_ssh(peer *Peer, network, addr string) (peerConnection, error) {
+func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
 	pk, err := loadPrivateKey(peer.GetOption(OptPrivateKey))
 	if err != nil {
 		return nil, err
@@ -154,7 +169,13 @@ func newPeerConnection_ssh(peer *Peer, network, addr string) (peerConnection, er
 		User: peer.GetOption(OptName),
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(pk)},
 	}
-	netConn, err := net.Dial(network, addr)
+	var addr string
+	if u.Scheme == "unix" {
+		addr = u.Path
+	} else {
+		addr = u.Host
+	}
+	netConn, err := net.Dial(u.Scheme, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -184,9 +205,9 @@ func newPeerConnection_ssh(peer *Peer, network, addr string) (peerConnection, er
 	name := <-nameCh // todo: timeout nameCh
 	go ssh_acceptChannels(chans, peer)
 	return &ssh_peerConnection{
-		addr: network + "://" + addr,
-		name: name,
-		conn: conn,
+		endpoint: u.String(),
+		name:     name,
+		conn:     conn,
 	}, nil
 }
 
