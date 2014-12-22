@@ -54,7 +54,7 @@ func newChannel(ch duplex.Channel) *Channel {
 				if err != io.EOF {
 					log.Println("debug:", err)
 				}
-				break
+				return
 			}
 			errorCh <- RemoteError(frame)
 		}

@@ -67,10 +67,17 @@ func makePair(t *testing.T) (*Peer, *Peer) {
 	return client, server
 }
 
+func shutdownPeer(t *testing.T, peer *Peer) {
+	err := peer.Shutdown()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSimpleCall(t *testing.T) {
 	client, server := makePair(t)
-	defer client.Shutdown()
-	defer server.Shutdown()
+	defer shutdownPeer(t, client)
+	defer shutdownPeer(t, server)
 
 	server.Register(new(Arith))
 	go server.Serve()
@@ -264,7 +271,10 @@ func streamingCheck(t *testing.T, client *Peer) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	call, _ := client.OpenCall(peer, "StreamingArith.Thrive", args, replyChan)
+	call, err := client.OpenCall(peer, "StreamingArith.Thrive", args, replyChan)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	count := 0
 	for reply := range replyChan {

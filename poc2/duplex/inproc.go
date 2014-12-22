@@ -68,8 +68,8 @@ func newPeerConnection_inproc(peer *Peer, u *url.URL) (peerConnection, error) {
 		return nil, errors.New("no peer listening with this identifier: " + u.Host)
 	}
 	remote.Lock()
-	remote.conns["inproc://"+u.Host] = &inproc_peerConnection{
-		identifier: u.Host,
+	remote.conns["inproc://"+peer.GetOption(OptName)] = &inproc_peerConnection{
+		identifier: peer.GetOption(OptName),
 		remote:     peer,
 		name:       peer.GetOption(OptName),
 		chans:      make([]*inproc_opened_ch, 0),
@@ -128,12 +128,11 @@ type inproc_opened_ch struct {
 }
 
 func (c *inproc_opened_ch) ReadFrame() ([]byte, error) {
-	select {
-	case <-c.closed:
-		return nil, io.EOF
-	default:
-		return <-c.framesIn, nil
+	frame, ok := <-c.framesIn
+	if ok {
+		return frame, nil
 	}
+	return nil, io.EOF
 }
 
 func (c *inproc_opened_ch) WriteFrame(frame []byte) error {
@@ -148,12 +147,11 @@ func (c *inproc_opened_ch) WriteFrame(frame []byte) error {
 }
 
 func (c *inproc_opened_ch) ReadError() ([]byte, error) {
-	select {
-	case <-c.closed:
-		return nil, io.EOF
-	default:
-		return <-c.errorsIn, nil
+	err, ok := <-c.errorsIn
+	if ok {
+		return err, nil
 	}
+	return nil, io.EOF
 }
 
 func (c *inproc_opened_ch) WriteError(frame []byte) error {
@@ -226,12 +224,11 @@ type inproc_accepted_ch struct {
 }
 
 func (c *inproc_accepted_ch) ReadFrame() ([]byte, error) {
-	select {
-	case <-c.opened.closed:
-		return nil, io.EOF
-	default:
-		return <-c.opened.framesOut, nil
+	frame, ok := <-c.opened.framesOut
+	if ok {
+		return frame, nil
 	}
+	return nil, io.EOF
 }
 
 func (c *inproc_accepted_ch) WriteFrame(frame []byte) error {
@@ -246,12 +243,11 @@ func (c *inproc_accepted_ch) WriteFrame(frame []byte) error {
 }
 
 func (c *inproc_accepted_ch) ReadError() ([]byte, error) {
-	select {
-	case <-c.opened.closed:
-		return nil, io.EOF
-	default:
-		return <-c.opened.errorsOut, nil
+	err, ok := <-c.opened.errorsOut
+	if ok {
+		return err, nil
 	}
+	return nil, io.EOF
 }
 
 func (c *inproc_accepted_ch) WriteError(frame []byte) error {
