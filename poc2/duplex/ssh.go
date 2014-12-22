@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -99,7 +100,6 @@ func newPeerListener_ssh(peer *Peer, u *url.URL) (peerListener, error) {
 		},
 	}
 	config.AddHostKey(pk)
-
 	var listener net.Listener
 	if u.Scheme == "unix" {
 		os.Remove(u.Path)
@@ -152,7 +152,9 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 	ok, _, err := sshConn.SendRequest("@duplex-greeting", true,
 		ssh.Marshal(&ssh_greetingPayload{peer.GetOption(OptName)}))
 	if err != nil || !ok {
-		log.Println("debug: failed to greet:", err)
+		if err != io.EOF {
+			log.Println("debug: failed to greet:", err)
+		}
 		return
 	}
 	ssh_acceptChannels(chans, peer)
@@ -218,29 +220,45 @@ type ssh_channel struct {
 	ssh_channelData
 }
 
-func (c *ssh_channel) ReadFrame() ([]byte, error) {
+func readFrame(r io.Reader) ([]byte, error) {
 	bytes := make([]byte, 4)
-	_, err := c.Read(bytes)
+	_, err := r.Read(bytes)
 	if err != nil {
 		return nil, err
 	}
 	length := binary.BigEndian.Uint32(bytes)
 	frame := make([]byte, length)
-	_, err = c.Read(frame)
-	// handle errors based on written bytes
+	_, err = r.Read(frame)
+	// TODO: handle errors based on written bytes
 	if err != nil {
 		return nil, err
 	}
 	return frame, nil
 }
 
-func (c *ssh_channel) WriteFrame(frame []byte) error {
+func writeFrame(w io.Writer, frame []byte) error {
 	var buffer []byte
 	n := uint32(len(frame))
 	buffer = append(buffer, byte(n>>24), byte(n>>16), byte(n>>8), byte(n))
 	buffer = append(buffer, frame...)
-	_, err := c.Write(buffer)
+	_, err := w.Write(buffer)
 	return err
+}
+
+func (c *ssh_channel) ReadFrame() ([]byte, error) {
+	return readFrame(c)
+}
+
+func (c *ssh_channel) WriteFrame(frame []byte) error {
+	return writeFrame(c, frame)
+}
+
+func (c *ssh_channel) ReadError() ([]byte, error) {
+	return readFrame(c.Stderr())
+}
+
+func (c *ssh_channel) WriteError(frame []byte) error {
+	return writeFrame(c.Stderr(), frame)
 }
 
 func (c *ssh_channel) Headers() []string {

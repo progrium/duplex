@@ -49,15 +49,15 @@ The heart of any plugin system is usually hooks or "delegate" APIs plugin author
 The API has gone through many changes but this is currently what it looks like in rough form, written as Go interfaces.
 
 	type Peer interface {
-		// Metadata and Options
+		// Options
 		SetOption(name, value string) error
 		GetOption(name string) string 
 
 		// Connections
-		Connect(uri string) error
-		Disconnect(uri string) error
-		Bind(uri string) error
-		Unbind(uri string) error
+		Connect(endpoint string) error
+		Disconnect(endpoint string) error
+		Bind(endpoint string) error
+		Unbind(endpoint string) error
 
 		// Remote Peers
 		Peers() []string
@@ -83,11 +83,11 @@ The API has gone through many changes but this is currently what it looks like i
 		Read(data []byte) (int, error)
 	
 		// Frames
-		WriteFrame(data []byte) error
+		WriteFrame(frame []byte) error
 		ReadFrame() ([]byte, error)
 	
-		// Error Frames
-		WriteError(data []byte) error
+		// Errors
+		WriteError(frame []byte) error
 		ReadError() ([]byte, error)
 
 		// EOF and Close

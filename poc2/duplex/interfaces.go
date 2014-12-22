@@ -11,6 +11,9 @@ type Channel interface {
 	WriteFrame(data []byte) error // send_frame
 	ReadFrame() ([]byte, error)   // recv_frame
 
+	WriteError(data []byte) error // send_error
+	ReadError() ([]byte, error)   // recv_error
+
 	CloseWrite() error // send_end .. close_send?
 	Close() error      // close
 
@@ -18,7 +21,6 @@ type Channel interface {
 	//Accept(chType string) (ChannelMeta, Channel)                    // recv_chan
 
 	//Join(rwc io.ReadWriteCloser) // join(fd)
-	//Errors() io.ReadWriter       // send_errframe + recv_errframe
 }
 
 type ChannelMeta interface {

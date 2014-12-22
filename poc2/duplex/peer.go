@@ -190,12 +190,16 @@ func (p *Peer) Shutdown() error {
 			return err
 		}
 	}
+	close(p.incomingCh)
 	return nil
 }
 
 func (p *Peer) Accept() (ChannelMeta, Channel) {
 	c := <-p.incomingCh
-	return c.(ChannelMeta), c.(Channel)
+	if c != nil {
+		return c.(ChannelMeta), c.(Channel)
+	}
+	return nil, nil
 }
 
 func (p *Peer) Open(peer, service string, headers []string) (Channel, error) {
