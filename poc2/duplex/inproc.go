@@ -51,9 +51,6 @@ func (c *inproc_peerConnection) Open(service string, headers []string) (Channel,
 		framesIn:  make(chan []byte, 1024),
 		errorsOut: make(chan []byte, 1024),
 		errorsIn:  make(chan []byte, 1024),
-		eofOut:    make(chan bool),
-		eofIn:     make(chan bool),
-		closed:    make(chan bool),
 	}
 	c.chans = append(c.chans, ch)
 	c.remote.incomingCh <- &inproc_accepted_ch{ch}
@@ -114,6 +111,7 @@ func newPeerListener_inproc(peer *Peer, u *url.URL) (peerListener, error) {
 // channels
 
 type inproc_opened_ch struct {
+	sync.Mutex
 	service   string
 	headers   []string
 	framesOut chan []byte
@@ -122,9 +120,9 @@ type inproc_opened_ch struct {
 	errorsIn  chan []byte
 	bufferOut bytes.Buffer
 	bufferIn  bytes.Buffer
-	eofOut    chan bool
-	eofIn     chan bool
-	closed    chan bool
+	eofOut    bool
+	eofIn     bool
+	closed    bool
 }
 
 func (c *inproc_opened_ch) ReadFrame() ([]byte, error) {
@@ -136,14 +134,13 @@ func (c *inproc_opened_ch) ReadFrame() ([]byte, error) {
 }
 
 func (c *inproc_opened_ch) WriteFrame(frame []byte) error {
-	select {
-	case <-c.eofOut:
-		return errors.New("channel writer closed")
-	case <-c.closed:
+	c.Lock()
+	defer c.Unlock()
+	if c.closed || c.eofOut {
 		return errors.New("channel closed")
-	case c.framesOut <- frame:
-		return nil
 	}
+	c.framesOut <- frame
+	return nil
 }
 
 func (c *inproc_opened_ch) ReadError() ([]byte, error) {
@@ -155,60 +152,60 @@ func (c *inproc_opened_ch) ReadError() ([]byte, error) {
 }
 
 func (c *inproc_opened_ch) WriteError(frame []byte) error {
-	select {
-	case <-c.eofOut:
-		return errors.New("channel writer closed")
-	case <-c.closed:
+	c.Lock()
+	defer c.Unlock()
+	if c.closed || c.eofOut {
 		return errors.New("channel closed")
-	case c.errorsOut <- frame:
-		return nil
 	}
+	c.errorsOut <- frame
+	return nil
 }
 
 func (c *inproc_opened_ch) Write(data []byte) (int, error) {
-	select {
-	case <-c.eofOut:
-		return 0, errors.New("channel writer closed")
-	case <-c.closed:
+	c.Lock()
+	defer c.Unlock()
+	if c.closed || c.eofOut {
 		return 0, errors.New("channel closed")
-	default:
-		return c.bufferOut.Write(data)
 	}
+	return c.bufferOut.Write(data)
 }
 
 func (c *inproc_opened_ch) Read(data []byte) (int, error) {
-	select {
-	case <-c.closed:
-		return 0, io.EOF
-	default:
-		return c.bufferIn.Read(data)
+	c.Lock()
+	defer c.Unlock()
+	if c.closed {
+		return 0, errors.New("channel closed")
 	}
+	return c.bufferIn.Read(data)
 }
 
 func (c *inproc_opened_ch) CloseWrite() error {
-	select {
-	case <-c.eofOut:
-		return errors.New("channel writer already closed")
-	case <-c.closed:
+	c.Lock()
+	defer c.Unlock()
+	if c.closed || c.eofOut {
 		return errors.New("channel already closed")
-	default:
-		close(c.eofOut)
-		return nil
 	}
+	c.eofOut = true
+	close(c.framesOut)
+	return nil
 }
 
 func (c *inproc_opened_ch) Close() error {
-	select {
-	case <-c.closed:
+	c.Lock()
+	defer c.Unlock()
+	if c.closed {
 		return errors.New("channel already closed")
-	default:
-		close(c.closed)
-		close(c.framesIn)
-		close(c.framesOut)
-		close(c.errorsIn)
-		close(c.errorsOut)
-		return nil
 	}
+	if !c.eofOut {
+		close(c.framesOut)
+	}
+	if !c.eofIn {
+		close(c.framesIn)
+	}
+	close(c.errorsIn)
+	close(c.errorsOut)
+	c.closed = true
+	return nil
 }
 
 func (c *inproc_opened_ch) Headers() []string {
@@ -232,14 +229,13 @@ func (c *inproc_accepted_ch) ReadFrame() ([]byte, error) {
 }
 
 func (c *inproc_accepted_ch) WriteFrame(frame []byte) error {
-	select {
-	case <-c.opened.eofIn:
-		return errors.New("channel writer closed")
-	case <-c.opened.closed:
+	c.opened.Lock()
+	defer c.opened.Unlock()
+	if c.opened.closed || c.opened.eofIn {
 		return errors.New("channel closed")
-	case c.opened.framesIn <- frame:
-		return nil
 	}
+	c.opened.framesIn <- frame
+	return nil
 }
 
 func (c *inproc_accepted_ch) ReadError() ([]byte, error) {
@@ -251,46 +247,42 @@ func (c *inproc_accepted_ch) ReadError() ([]byte, error) {
 }
 
 func (c *inproc_accepted_ch) WriteError(frame []byte) error {
-	select {
-	case <-c.opened.eofIn:
-		return errors.New("channel writer closed")
-	case <-c.opened.closed:
+	c.opened.Lock()
+	defer c.opened.Unlock()
+	if c.opened.closed || c.opened.eofIn {
 		return errors.New("channel closed")
-	case c.opened.errorsIn <- frame:
-		return nil
 	}
+	c.opened.errorsIn <- frame
+	return nil
 }
 
 func (c *inproc_accepted_ch) Write(data []byte) (int, error) {
-	select {
-	case <-c.opened.eofIn:
-		return 0, errors.New("channel writer closed")
-	case <-c.opened.closed:
+	c.opened.Lock()
+	defer c.opened.Unlock()
+	if c.opened.closed || c.opened.eofIn {
 		return 0, errors.New("channel closed")
-	default:
-		return c.opened.bufferIn.Write(data)
 	}
+	return c.opened.bufferIn.Write(data)
 }
 
 func (c *inproc_accepted_ch) Read(data []byte) (int, error) {
-	select {
-	case <-c.opened.closed:
-		return 0, io.EOF
-	default:
-		return c.opened.bufferOut.Read(data)
+	c.opened.Lock()
+	defer c.opened.Unlock()
+	if c.opened.closed {
+		return 0, errors.New("channel closed")
 	}
+	return c.opened.bufferOut.Read(data)
 }
 
 func (c *inproc_accepted_ch) CloseWrite() error {
-	select {
-	case <-c.opened.eofIn:
-		return errors.New("channel writer already closed")
-	case <-c.opened.closed:
+	c.opened.Lock()
+	defer c.opened.Unlock()
+	if c.opened.closed || c.opened.eofIn {
 		return errors.New("channel already closed")
-	default:
-		close(c.opened.eofIn)
-		return nil
 	}
+	c.opened.eofIn = true
+	close(c.opened.framesIn)
+	return nil
 }
 
 func (c *inproc_accepted_ch) Close() error {

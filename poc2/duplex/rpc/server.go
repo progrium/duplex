@@ -290,5 +290,6 @@ func (p *Peer) Serve() {
 				ch.CloseWrite()
 			}
 		}
+		ch.Close()
 	}
 }

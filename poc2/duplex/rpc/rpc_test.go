@@ -227,8 +227,8 @@ func (t *StreamingArith) Thrive(args StreamingArgs, stream SendStream) error {
 		if err != nil {
 			return nil
 		}
-	}
 
+	}
 	return nil
 }
 
@@ -413,11 +413,13 @@ func TestInterruptedCallByServer(t *testing.T) {
 
 	// check we get the error at the 30th call exactly
 	count := 0
+	fmt.Println("thrive", count)
 	for reply := range output {
 		if reply.Index != count {
 			t.Fatal("unexpected value:", reply.Index)
 		}
 		count += 1
+		fmt.Println("thrive", count)
 	}
 	if count != 30 {
 		t.Fatal("received error before the right time:", count)
