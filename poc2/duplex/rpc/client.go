@@ -51,8 +51,8 @@ func isChanOfPointers(c interface{}) bool {
 
 		OpenCall(peer, method string, arg T1, reply *T2) (*Call, error)
 		OpenCall(peer, method string, arg T1, replyStream chan *T2) (*Call, error)
-		OpenCall(peer, method string, argStream *SendStream, replyStream chan *T2) (*Call, error)
 		OpenCall(peer, method string, argStream *SendStream, reply *T2) (*Call, error)
+		OpenCall(peer, method string, argStream *SendStream, replyStream chan *T2) (*Call, error)
 */
 func (p *Peer) OpenCall(peer, method string, input interface{}, output interface{}) (*Call, error) {
 	channel, err := p.Open(peer, method, nil)

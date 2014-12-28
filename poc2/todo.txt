@@ -1,0 +1,12 @@
+duplex:
+- background connection retry on unexpected disconnects
+- block and wait when Open on peers that don't exist w/ configurable timeout
+- add sending trailers, access with ChannelMeta.Trailers()
+- add flags to channel data wire format
+- add attached flag, implement channel open/accept
+- test join
+
+rpc:
+- fix broken test
+- add configurable/multiple codecs
+- server code cleanup

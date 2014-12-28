@@ -65,17 +65,17 @@ func newPeerConnection_inproc(peer *Peer, u *url.URL) (peerConnection, error) {
 		return nil, errors.New("no peer listening with this identifier: " + u.Host)
 	}
 	remote.Lock()
-	remote.conns["inproc://"+peer.GetOption(OptName)] = &inproc_peerConnection{
-		identifier: peer.GetOption(OptName),
+	remote.conns["inproc://"+peer.GetOption(OptName).(string)] = &inproc_peerConnection{
+		identifier: peer.GetOption(OptName).(string),
 		remote:     peer,
-		name:       peer.GetOption(OptName),
+		name:       peer.GetOption(OptName).(string),
 		chans:      make([]*inproc_opened_ch, 0),
 	}
 	remote.Unlock()
 	return &inproc_peerConnection{
 		identifier: u.Host,
 		remote:     remote,
-		name:       remote.GetOption(OptName),
+		name:       remote.GetOption(OptName).(string),
 		chans:      make([]*inproc_opened_ch, 0),
 	}, nil
 }
@@ -216,6 +216,14 @@ func (c *inproc_opened_ch) Service() string {
 	return c.service
 }
 
+func (c *inproc_opened_ch) Meta() ChannelMeta {
+	return c
+}
+
+func (c *inproc_opened_ch) Join(rwc io.ReadWriteCloser) {
+	go joinChannel(c, rwc)
+}
+
 type inproc_accepted_ch struct {
 	opened *inproc_opened_ch
 }
@@ -295,4 +303,12 @@ func (c *inproc_accepted_ch) Headers() []string {
 
 func (c *inproc_accepted_ch) Service() string {
 	return c.opened.service
+}
+
+func (c *inproc_accepted_ch) Meta() ChannelMeta {
+	return c.opened
+}
+
+func (c *inproc_accepted_ch) Join(rwc io.ReadWriteCloser) {
+	go joinChannel(c, rwc)
 }

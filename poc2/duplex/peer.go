@@ -2,22 +2,30 @@ package duplex
 
 import (
 	"errors"
+	"math"
+	"math/rand"
 	"net/url"
 	"sort"
 	"sync"
+	"time"
 
 	"code.google.com/p/go-uuid/uuid"
 )
 
 const (
-	OptPrivateKey     = "privatekey"
-	OptAuthorizedKeys = "authorizedkeys"
-	OptName           = "name"
+	OptPrivateKey       = iota // filepath string
+	OptAuthorizedKeys          // filepath string
+	OptName                    // string
+	OptRetryInterval           // int (milliseconds)
+	OptRetryIntervalMax        // int (milliseconds)
+
+	retryFactor = math.E        // 2.72ish, math.Phi could also be good
+	retryJitter = 0.11962656472 // molar Planck constant times c, joule meter/mole
 )
 
 type Peer struct {
 	sync.Mutex
-	options    map[string]string
+	options    map[int]interface{}
 	conns      map[string]peerConnection
 	binds      map[string]peerListener
 	incomingCh chan interface{}
@@ -25,12 +33,16 @@ type Peer struct {
 	rrIndex    int
 }
 
+type peerConnFactory func(peer *Peer, endpoint *url.URL) (peerConnection, error)
+
 func NewPeer() *Peer {
 	return &Peer{
-		options: map[string]string{
-			OptPrivateKey:     "~/.ssh/id_rsa",
-			OptAuthorizedKeys: "~/.ssh/authorized_keys",
-			OptName:           uuid.New(),
+		options: map[int]interface{}{
+			OptPrivateKey:       "~/.ssh/id_rsa",
+			OptAuthorizedKeys:   "~/.ssh/authorized_keys",
+			OptName:             uuid.New(),
+			OptRetryInterval:    100,
+			OptRetryIntervalMax: 0,
 		},
 		conns:      make(map[string]peerConnection),
 		binds:      make(map[string]peerListener),
@@ -45,9 +57,7 @@ func (p *Peer) Bind(endpoint string) error {
 	}
 	var l peerListener
 	switch u.Scheme {
-	case "tcp":
-		l, err = newPeerListener_ssh(p, u)
-	case "unix":
+	case "tcp", "unix":
 		l, err = newPeerListener_ssh(p, u)
 	case "inproc":
 		l, err = newPeerListener_inproc(p, u)
@@ -78,6 +88,38 @@ func (p *Peer) Unbind(endpoint string) error {
 	return nil
 }
 
+func (p *Peer) retryConnect(fn peerConnFactory, endpoint *url.URL) (peerConnection, error) {
+	if p.GetOption(OptRetryInterval).(int) == -1 {
+		// no retry
+		return fn(p, endpoint)
+	}
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	delay := float64(p.GetOption(OptRetryInterval).(int))
+	if p.GetOption(OptRetryIntervalMax).(int) == 0 {
+		// constant (but randomized) retry, no backoff
+		for {
+			c, err := fn(p, endpoint)
+			if err == nil {
+				return c, err
+			}
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+			delay = r.NormFloat64()*(delay*retryJitter) + delay
+		}
+	}
+	// backoff algorithm copied from Twisted's ReconnectingClientFactory
+	// http://twistedmatrix.com/trac/browser/tags/releases/twisted-8.2.0/twisted/internet/protocol.py#L198
+	delayMax := float64(p.GetOption(OptRetryIntervalMax).(int))
+	for {
+		c, err := fn(p, endpoint)
+		if err == nil {
+			return c, err
+		}
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+		delay = math.Min(delay*retryFactor, delayMax)
+		delay = r.NormFloat64()*(delay*retryJitter) + delay
+	}
+}
+
 func (p *Peer) Connect(endpoint string) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
@@ -85,10 +127,8 @@ func (p *Peer) Connect(endpoint string) error {
 	}
 	var c peerConnection
 	switch u.Scheme {
-	case "tcp":
-		c, err = newPeerConnection_ssh(p, u)
-	case "unix":
-		c, err = newPeerConnection_ssh(p, u)
+	case "tcp", "unix":
+		c, err = p.retryConnect(newPeerConnection_ssh, u)
 	case "inproc":
 		c, err = newPeerConnection_inproc(p, u)
 	default:
@@ -159,18 +199,18 @@ func (p *Peer) NextPeer() (string, error) {
 	return peers[p.rrIndex%len(peers)], nil
 }
 
-func (p *Peer) SetOption(name, value string) error {
+func (p *Peer) SetOption(option int, value interface{}) error {
 	p.Lock()
 	defer p.Unlock()
 	// TODO: define and validate options
-	p.options[name] = value
+	p.options[option] = value
 	return nil
 }
 
-func (p *Peer) GetOption(name string) string {
+func (p *Peer) GetOption(option int) interface{} {
 	p.Lock()
 	defer p.Unlock()
-	return p.options[name]
+	return p.options[option]
 }
 
 func (p *Peer) Shutdown() error {

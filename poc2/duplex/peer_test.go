@@ -41,11 +41,11 @@ func TestConnectPeers(t *testing.T) {
 			t.Fatal(f(uri), err)
 		}
 		// client SHOULD have server as peer
-		if len(client.Peers()) != 1 || client.Peers()[0] != server.GetOption(OptName) {
+		if len(client.Peers()) != 1 || client.Peers()[0] != server.GetOption(OptName).(string) {
 			t.Fatal(f(uri), "unexpected client peers:", client.Peers())
 		}
 		// server SHOULD have client as peer
-		if len(server.Peers()) != 1 || server.Peers()[0] != client.GetOption(OptName) {
+		if len(server.Peers()) != 1 || server.Peers()[0] != client.GetOption(OptName).(string) {
 			t.Fatal(f(uri), "unexpected server peers:", server.Peers())
 		}
 		// disconnect client from server
@@ -55,7 +55,7 @@ func TestConnectPeers(t *testing.T) {
 		}
 		// server may not drop client immediately
 		// so we drop the peer explicitly just in case
-		server.Drop(client.GetOption(OptName))
+		server.Drop(client.GetOption(OptName).(string))
 		// server and client SHOULD have no peers
 		if len(client.Peers()) != 0 || len(server.Peers()) != 0 {
 			t.Fatal(f(uri), "peers not disconnected:",
@@ -96,23 +96,23 @@ func TestConnect3Peers(t *testing.T) {
 			t.Fatal(f(uri), err)
 		}
 		// client1 and client2 SHOULD have server as peer
-		if len(client1.Peers()) != 1 || client1.Peers()[0] != server.GetOption(OptName) {
+		if len(client1.Peers()) != 1 || client1.Peers()[0] != server.GetOption(OptName).(string) {
 			t.Fatal(f(uri), "unexpected client1 peers:", client1.Peers())
 		}
-		if len(client2.Peers()) != 1 || client2.Peers()[0] != server.GetOption(OptName) {
+		if len(client2.Peers()) != 1 || client2.Peers()[0] != server.GetOption(OptName).(string) {
 			t.Fatal(f(uri), "unexpected client2 peers:", client2.Peers())
 		}
 		// server SHOULD have both clients as peers
 		if len(server.Peers()) != 2 ||
-			!strings.Contains(strings.Join(server.Peers(), " "), client1.GetOption(OptName)) ||
-			!strings.Contains(strings.Join(server.Peers(), " "), client2.GetOption(OptName)) {
+			!strings.Contains(strings.Join(server.Peers(), " "), client1.GetOption(OptName).(string)) ||
+			!strings.Contains(strings.Join(server.Peers(), " "), client2.GetOption(OptName).(string)) {
 			t.Fatal(f(uri), "unexpected server peers:", server.Peers())
 		}
 		// drop all peers from all peers
-		server.Drop(client1.GetOption(OptName))
-		server.Drop(client2.GetOption(OptName))
-		client1.Drop(server.GetOption(OptName))
-		client2.Drop(server.GetOption(OptName))
+		server.Drop(client1.GetOption(OptName).(string))
+		server.Drop(client2.GetOption(OptName).(string))
+		client1.Drop(server.GetOption(OptName).(string))
+		client2.Drop(server.GetOption(OptName).(string))
 		// all peers SHOULD have no peers
 		if len(client1.Peers()) != 0 || len(client2.Peers()) != 0 || len(server.Peers()) != 0 {
 			t.Fatal(f(uri), "peers not disconnected:",
@@ -141,7 +141,7 @@ func TestOpenChannels(t *testing.T) {
 		}
 		for i := 0; i < 2; i++ {
 			// open a channel on one peer
-			_, err := server.Open(client.GetOption(OptName), "test-service", []string{"foo=bar"})
+			_, err := server.Open(client.GetOption(OptName).(string), "test-service", []string{"foo=bar"})
 			if err != nil {
 				t.Fatal(f(uri), err)
 			}
@@ -191,6 +191,9 @@ func TestBalancedFrameChannels(t *testing.T) {
 		echoOnceService := func(peer *Peer) {
 			for {
 				meta, ch := peer.Accept()
+				if meta == nil {
+					return
+				}
 				if meta.Service() != "echo" {
 					t.Fatal(f(uri), "unexpected service on accepted channel:", meta.Service())
 				}

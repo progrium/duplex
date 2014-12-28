@@ -45,9 +45,13 @@ type ssh_channelData struct {
 
 type ssh_peerListener struct {
 	net.Listener
+	path string
 }
 
 func (l *ssh_peerListener) Unbind() error {
+	if l.path != "" {
+		os.Remove(l.path)
+	}
 	return l.Close()
 }
 
@@ -87,7 +91,7 @@ func (c *ssh_peerConnection) Open(service string, headers []string) (Channel, er
 // ssh server
 
 func newPeerListener_ssh(peer *Peer, u *url.URL) (peerListener, error) {
-	pk, err := loadPrivateKey(peer.GetOption(OptPrivateKey))
+	pk, err := loadPrivateKey(peer.GetOption(OptPrivateKey).(string))
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +124,11 @@ func newPeerListener_ssh(peer *Peer, u *url.URL) (peerListener, error) {
 			go ssh_handleConn(conn, config, peer)
 		}
 	}()
-	return &ssh_peerListener{listener}, nil
+	if u.Scheme == "unix" {
+		return &ssh_peerListener{listener, u.Path}, nil
+	} else {
+		return &ssh_peerListener{listener, ""}, nil
+	}
 }
 
 func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
@@ -150,7 +158,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 	}()*/
 	go ssh.DiscardRequests(reqs)
 	ok, _, err := sshConn.SendRequest("@duplex-greeting", true,
-		ssh.Marshal(&ssh_greetingPayload{peer.GetOption(OptName)}))
+		ssh.Marshal(&ssh_greetingPayload{peer.GetOption(OptName).(string)}))
 	if err != nil || !ok {
 		if err != io.EOF {
 			log.Println("debug: failed to greet:", err)
@@ -163,12 +171,12 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 // ssh client
 
 func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
-	pk, err := loadPrivateKey(peer.GetOption(OptPrivateKey))
+	pk, err := loadPrivateKey(peer.GetOption(OptPrivateKey).(string))
 	if err != nil {
 		return nil, err
 	}
 	config := &ssh.ClientConfig{
-		User: peer.GetOption(OptName),
+		User: peer.GetOption(OptName).(string),
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(pk)},
 	}
 	var addr string
@@ -261,12 +269,20 @@ func (c *ssh_channel) WriteError(frame []byte) error {
 	return writeFrame(c.Stderr(), frame)
 }
 
+func (c *ssh_channel) Meta() ChannelMeta {
+	return c
+}
+
 func (c *ssh_channel) Headers() []string {
 	return c.ssh_channelData.Headers
 }
 
 func (c *ssh_channel) Service() string {
 	return c.ssh_channelData.Service
+}
+
+func (c *ssh_channel) Join(rwc io.ReadWriteCloser) {
+	go joinChannel(c, rwc)
 }
 
 func ssh_acceptChannels(chans <-chan ssh.NewChannel, peer *Peer) {

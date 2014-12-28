@@ -1,7 +1,7 @@
 package duplex
 
 import (
-//"io"
+	"io"
 )
 
 type Channel interface {
@@ -20,7 +20,9 @@ type Channel interface {
 	//Open(chType, service string, headers []string) (Channel, error) // send_chan
 	//Accept(chType string) (ChannelMeta, Channel)                    // recv_chan
 
-	//Join(rwc io.ReadWriteCloser) // join(fd)
+	Join(rwc io.ReadWriteCloser) // join(fd)
+
+	Meta() ChannelMeta
 }
 
 type ChannelMeta interface {

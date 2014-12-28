@@ -255,13 +255,11 @@ func (p *Peer) Serve() {
 		}
 
 		if rmethod.Channel {
+			// method just takes a channel object
 			if errmsg, err := errVal(rmethod.Method.Func.Call([]reflect.Value{service.rcvr, reflect.ValueOf(ch)})); err {
 				ch.WriteError([]byte(errmsg))
-				ch.Close()
-			} else {
-				//ch.CloseWrite()
-				ch.Close()
 			}
+			ch.Close()
 			continue
 		}
 
@@ -283,11 +281,8 @@ func (p *Peer) Serve() {
 		if errmsg, err := errVal(rmethod.Call(service.rcvr, input, output, contextv)); err {
 			ch.WriteError([]byte(errmsg))
 		} else {
-			if rmethod.StreamingOuput() {
-				ch.CloseWrite()
-			} else {
+			if !rmethod.StreamingOuput() {
 				ch.WriteObject(output.Interface())
-				ch.CloseWrite()
 			}
 		}
 		ch.Close()
