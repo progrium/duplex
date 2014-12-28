@@ -28,7 +28,7 @@ Once PoC2 is finished, the plan is again to port to C, using an existing SSH imp
 
 The main primitives in Duplex are Peers and Channels. Peers are like advanced sockets that can connect and be connected to. They most closely resemble ZeroMQ sockets. Behind the scenes they are both an SSH server and client up to the SSH Connection Layer. There's no terminals or shelling out here, we just use the lower level protocols that give us encrypted, bi-directional, multiplexed streams. These streams are exposed as Channels. 
 
-Channels are much closer to a regular socket connection, but are tunneled through the secure connections between Peers. Unlike regular TCP connections, Channels come with some metadata, including their intended service and key-value headers. The Channel API has basic send/recv calls, but also calls for sending and receiving message frames. It also utilizes what SSH would use for STDERR to send error frames. 
+Channels are much closer to a regular socket connection, but are tunneled through the secure connections between Peers. Unlike regular TCP connections, Channels come with some metadata, including their intended service and key-value headers. The Channel API has basic send/recv calls, but also calls for sending and receiving message frames. It also utilizes what SSH would use for stderr to send error frames. 
 
 Frames are just length prefixed payloads of bytes. Frames can go in either direction. This is a solid foundation for any application protocol. What's more, you can send Channels over Channels. Just think about that.
 
@@ -50,8 +50,8 @@ The API has gone through many changes but this is currently what it looks like i
 
 	type Peer interface {
 		// Options
-		SetOption(name, value string) error
-		GetOption(name string) string 
+		SetOption(option int, value interface{}) error
+		GetOption(option int) interface{} 
 
 		// Connections
 		Connect(endpoint string) error
@@ -75,6 +75,7 @@ The API has gone through many changes but this is currently what it looks like i
 	type ChannelMeta interface {
 		Service() string
 		Headers() []string
+		Trailers() []string
 	}
 
 	type Channel interface {
@@ -93,6 +94,7 @@ The API has gone through many changes but this is currently what it looks like i
 		// EOF and Close
 		CloseWrite() error
 		Close() error
+		CloseWithTrailers(trailers []string) error
 	
 		// Channels of Channels
 		Open(service string, headers []string) (Channel, error)
@@ -100,6 +102,9 @@ The API has gone through many changes but this is currently what it looks like i
 	
 		// Attach to real sockets for gateways/proxies
 		Join(rwc io.ReadWriteCloser)
+
+		// Reference to ChannelMeta
+		Meta() ChannelMeta
 	}
 
 ## License
