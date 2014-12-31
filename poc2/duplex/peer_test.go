@@ -213,12 +213,7 @@ func TestBalancedFrameChannels(t *testing.T) {
 		go echoOnceService(server2)
 		// balance some requests across the servers
 		for i := 0; i < 4; i++ {
-			peer, err := client.NextPeer()
-			if err != nil {
-				t.Fatal(f(uri), err)
-			}
-			//println(i, uri, peer)
-			ch, err := client.Open(peer, "echo", nil)
+			ch, err := client.Open(client.NextPeer(), "echo", nil)
 			if err != nil {
 				t.Fatal(f(uri), err)
 			}

@@ -104,10 +104,7 @@ func TestAsyncCall(t *testing.T) {
 
 	// Out of order.
 	args := &Args{7, 8}
-	peer, err := client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	peer := client.NextPeer()
 	mulReply := new(Reply)
 	mulCall, _ := client.OpenCall(peer, "Arith.Mul", args, mulReply)
 	addReply := new(Reply)
@@ -267,11 +264,7 @@ func (t *StreamingArith) Echo(channel *Channel) error {
 func streamingCheck(t *testing.T, client *Peer) {
 	args := &StreamingArgs{3, 5, -1}
 	replyChan := make(chan *StreamingReply, 10)
-	peer, err := client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	call, err := client.OpenCall(peer, "StreamingArith.Thrive", args, replyChan)
+	call, err := client.OpenCall(client.NextPeer(), "StreamingArith.Thrive", args, replyChan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,11 +308,7 @@ func TestStreamingInput(t *testing.T) {
 
 	input := new(SendStream)
 	reply := new(StreamingReply)
-	peer, err := client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	call, err := client.OpenCall(peer, "StreamingArith.Sum", input, reply)
+	call, err := client.OpenCall(client.NextPeer(), "StreamingArith.Sum", input, reply)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -352,11 +341,7 @@ func TestStreamingInputOutput(t *testing.T) {
 
 	input := new(SendStream)
 	output := make(chan *StreamingReply, 10)
-	peer, err := client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	call, err := client.OpenCall(peer, "StreamingArith.Echo", input, output)
+	call, err := client.OpenCall(client.NextPeer(), "StreamingArith.Echo", input, output)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -405,11 +390,7 @@ func TestInterruptedCallByServer(t *testing.T) {
 
 	args := &StreamingArgs{3, 100, 30} // 30 elements back, then error
 	output := make(chan *StreamingReply, 10)
-	peer, err := client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, _ := client.OpenCall(peer, "StreamingArith.Thrive", args, output)
+	c, _ := client.OpenCall(client.NextPeer(), "StreamingArith.Thrive", args, output)
 
 	// check we get the error at the 30th call exactly
 	count := 0
@@ -434,11 +415,7 @@ func TestInterruptedCallByServer(t *testing.T) {
 	// then check a call that doesn't send anything, but errors out first
 	args = &StreamingArgs{3, 100, 0}
 	output = make(chan *StreamingReply, 10)
-	peer, err = client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, _ = client.OpenCall(peer, "StreamingArith.Thrive", args, output)
+	c, _ = client.OpenCall(client.NextPeer(), "StreamingArith.Thrive", args, output)
 	_, ok := <-output
 	if ok {
 		t.Fatal("expected closed channel")
@@ -462,11 +439,7 @@ func TestInterruptedCallByClient(t *testing.T) {
 
 	args := &StreamingArgs{3, 1000, -1}
 	output := make(chan *StreamingReply, 10)
-	peer, err := client.NextPeer()
-	if err != nil {
-		t.Fatal(err)
-	}
-	c, _ := client.OpenCall(peer, "StreamingArith.Thrive", args, output)
+	c, _ := client.OpenCall(client.NextPeer(), "StreamingArith.Thrive", args, output)
 	go func() {
 		count := 0
 		for _ = range output {
@@ -476,7 +449,7 @@ func TestInterruptedCallByClient(t *testing.T) {
 			t.Fatal("expected stream to be stopped by client")
 		}
 	}()
-	err = c.Close()
+	err := c.Close()
 	if err != nil {
 		t.Fatal(err.Error())
 	}

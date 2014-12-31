@@ -62,7 +62,7 @@ The API has gone through many changes but this is currently what it looks like i
 		// Remote Peers
 		Peers() []string
 		Drop(peer string) error
-		NextPeer() (string, error)
+		NextPeer() string
 
 		// Channels
 		Accept() (ChannelMeta, Channel)

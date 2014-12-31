@@ -8,8 +8,7 @@ import (
 )
 
 type Call struct {
-	channel *Channel
-	peer    *Peer
+	*Channel
 
 	Method       string // The name of the service and method to call.
 	Input        interface{}
@@ -19,10 +18,6 @@ type Call struct {
 	Error        error       // After completion, the error status.
 	Done         chan *Call  // Strobes when call is complete
 
-}
-
-func (c *Call) Close() error {
-	return c.channel.Close()
 }
 
 func (c *Call) done() {
@@ -35,15 +30,6 @@ func (c *Call) done() {
 	if c.OutputStream != nil {
 		reflect.ValueOf(c.OutputStream).Close()
 	}
-}
-
-func isChanOfPointers(c interface{}) bool {
-	typ := reflect.TypeOf(c)
-	// FIXME: check the direction of the channel, maybe?
-	if typ.Kind() != reflect.Chan || typ.Elem().Kind() != reflect.Ptr {
-		return false
-	}
-	return true
 }
 
 /*
@@ -63,28 +49,29 @@ func (p *Peer) OpenCall(peer, method string, input interface{}, output interface
 		return nil, errors.New("duplex: peer is closed")
 	}
 	call := new(Call)
-	call.channel = channel
-	call.peer = p
+	call.Channel = channel
 	call.Method = method
 	call.Done = make(chan *Call, 1) // buffered
 
 	inType := reflect.TypeOf(input)
 	if inType == reflect.PtrTo(typeOfSendStream) {
 		call.InputStream = input.(*SendStream)
-		call.InputStream.channel = call.channel
+		call.InputStream.channel = call.Channel
 	} else {
 		call.Input = input
-		err := call.channel.WriteObject(input)
+		err := call.WriteObject(input)
 		if err != nil {
 			return nil, err
 		}
-		err = call.channel.CloseWrite()
+		err = call.CloseWrite()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if isChanOfPointers(output) {
+	typ := reflect.TypeOf(output)
+	// FIXME: check the direction of the channel, maybe?
+	if typ.Kind() != reflect.Chan || typ.Elem().Kind() != reflect.Ptr {
 		call.OutputStream = output
 		go func() {
 			defer call.done()
@@ -92,7 +79,7 @@ func (p *Peer) OpenCall(peer, method string, input interface{}, output interface
 				// call.OutputStream is a chan *T2
 				// we need to create a T2 and get a *T2 back
 				value := reflect.New(reflect.TypeOf(call.OutputStream).Elem().Elem()).Interface()
-				err := call.channel.ReadObject(value)
+				err := call.ReadObject(value)
 				if err != nil {
 					if err != io.EOF {
 						call.Error = RemoteError(err.Error())
@@ -115,7 +102,7 @@ func (p *Peer) OpenCall(peer, method string, input interface{}, output interface
 		call.Output = output
 		go func() {
 			defer call.done()
-			err := call.channel.ReadObject(call.Output)
+			err := call.ReadObject(call.Output)
 			if err != nil && err != io.EOF {
 				// TODO handle non remote/parsing error
 				call.Error = RemoteError(err.Error())
@@ -128,11 +115,7 @@ func (p *Peer) OpenCall(peer, method string, input interface{}, output interface
 // Call invokes the named function, waits for it to complete, and returns its error status.
 // It also uses NextPeer to round robin request channels across connections.
 func (peer *Peer) Call(method string, args interface{}, reply interface{}) error {
-	target, err := peer.NextPeer()
-	if err != nil {
-		return err
-	}
-	call, err := peer.OpenCall(target, method, args, reply)
+	call, err := peer.OpenCall(peer.NextPeer(), method, args, reply)
 	if err != nil {
 		return err
 	}

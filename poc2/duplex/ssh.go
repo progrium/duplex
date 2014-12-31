@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -132,7 +131,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 	defer conn.Close()
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, config)
 	if err != nil {
-		log.Println("debug: failed to handshake:", err)
+		debug("failed to handshake:", err)
 		return
 	}
 	endpoint := conn.RemoteAddr().Network() + "://" + conn.RemoteAddr().String()
@@ -154,7 +153,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 	peer.Unlock()
 	go func() {
 		sshConn.Wait()
-		//log.Println("debug: server disconnection: ", err)
+		//debug("server disconnection: ", err)
 		// TODO: handle unexpected disconnect
 	}()
 	go ssh.DiscardRequests(reqs)
@@ -162,7 +161,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 		ssh.Marshal(&ssh_greetingPayload{peer.GetOption(OptName).(string)}))
 	if err != nil || !ok {
 		if err != io.EOF {
-			log.Println("debug: failed to greet:", err)
+			debug("failed to greet:", err)
 		}
 		return
 	}
@@ -221,7 +220,7 @@ func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
 	}
 	go func() {
 		conn.Wait()
-		//log.Println("debug: client disconnection: ", err)
+		//debug("client disconnection: ", err)
 		// TODO: handle unexpected disconnect
 	}()
 	pc := &ssh_peerConnection{
@@ -357,7 +356,7 @@ func ssh_acceptChannels(chans <-chan ssh.NewChannel, peerConn *ssh_peerConnectio
 				}
 				ch, reqs, err := newCh.Accept()
 				if err != nil {
-					log.Println("debug: accept error:", err)
+					debug("accept error:", err)
 					return
 				}
 				go ssh.DiscardRequests(reqs)
