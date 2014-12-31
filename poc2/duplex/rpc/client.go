@@ -72,6 +72,18 @@ func (p *Peer) OpenCall(peer, method string, input interface{}, output interface
 	typ := reflect.TypeOf(output)
 	// FIXME: check the direction of the channel, maybe?
 	if typ.Kind() != reflect.Chan || typ.Elem().Kind() != reflect.Ptr {
+		// output is not channel of pointers
+		call.Output = output
+		go func() {
+			defer call.done()
+			err := call.ReadObject(call.Output)
+			if err != nil && err != io.EOF {
+				// TODO handle non remote/parsing error
+				call.Error = RemoteError(err.Error())
+			}
+		}()
+	} else {
+		// output is channel of pointers
 		call.OutputStream = output
 		go func() {
 			defer call.done()
@@ -96,16 +108,6 @@ func (p *Peer) OpenCall(peer, method string, input interface{}, output interface
 						return
 					}
 				}
-			}
-		}()
-	} else {
-		call.Output = output
-		go func() {
-			defer call.done()
-			err := call.ReadObject(call.Output)
-			if err != nil && err != io.EOF {
-				// TODO handle non remote/parsing error
-				call.Error = RemoteError(err.Error())
 			}
 		}()
 	}
