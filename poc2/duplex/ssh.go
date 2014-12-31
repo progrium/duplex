@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/user"
 	"strings"
+	"time"
 
 	"github.com/progrium/crypto/ssh"
 )
@@ -59,8 +60,9 @@ func (l *ssh_peerListener) Unbind() error {
 
 type ssh_peerConnection struct {
 	endpoint string
-	name     string
+	remote   string
 	conn     ssh.Conn
+	local    string
 }
 
 func (c *ssh_peerConnection) Disconnect() error {
@@ -68,7 +70,7 @@ func (c *ssh_peerConnection) Disconnect() error {
 }
 
 func (c *ssh_peerConnection) Name() string {
-	return c.name
+	return c.remote
 }
 
 func (c *ssh_peerConnection) Endpoint() string {
@@ -85,7 +87,12 @@ func (c *ssh_peerConnection) Open(service string, headers []string) (Channel, er
 		return nil, err
 	}
 	go ssh.DiscardRequests(reqs)
-	return &ssh_channel{ch, meta}, nil
+	return &ssh_channel{
+		Channel:         ch,
+		ssh_channelData: meta,
+		localPeer:       c.local,
+		remotePeer:      c.remote,
+	}, nil
 }
 
 // ssh server
@@ -145,17 +152,20 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 		// peer name when we don't have a remote address.
 		endpoint = conn.RemoteAddr().Network() + "://" + sshConn.User()
 	}
+	localPeer := peer.GetOption(OptName).(string)
 	peer.Lock()
 	peer.conns[endpoint] = &ssh_peerConnection{
 		endpoint: endpoint,
-		name:     sshConn.User(),
+		remote:   sshConn.User(),
 		conn:     sshConn,
+		local:    localPeer,
 	}
 	peer.Unlock()
-	/*go func() {
+	go func() {
 		sshConn.Wait()
-		log.Println(peer.Disconnect(endpoint))
-	}()*/
+		//log.Println("debug: server disconnection: ", err)
+		// TODO: handle unexpected disconnect
+	}()
 	go ssh.DiscardRequests(reqs)
 	ok, _, err := sshConn.SendRequest("@duplex-greeting", true,
 		ssh.Marshal(&ssh_greetingPayload{peer.GetOption(OptName).(string)}))
@@ -165,7 +175,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 		}
 		return
 	}
-	ssh_acceptChannels(chans, peer)
+	ssh_acceptChannels(chans, sshConn.User(), peer)
 }
 
 // ssh client
@@ -212,12 +222,23 @@ func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
 			}
 		}
 	}()
-	name := <-nameCh // todo: timeout nameCh
-	go ssh_acceptChannels(chans, peer)
+	var name string
+	select {
+	case name = <-nameCh:
+	case <-time.After(time.Second * 5):
+		return nil, errors.New("greeting timeout")
+	}
+	go func() {
+		conn.Wait()
+		//log.Println("debug: client disconnection: ", err)
+		// TODO: handle unexpected disconnect
+	}()
+	go ssh_acceptChannels(chans, name, peer)
 	return &ssh_peerConnection{
 		endpoint: u.String(),
-		name:     name,
+		remote:   name,
 		conn:     conn,
+		local:    peer.GetOption(OptName).(string),
 	}, nil
 }
 
@@ -226,6 +247,8 @@ func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
 type ssh_channel struct {
 	ssh.Channel
 	ssh_channelData
+	localPeer  string
+	remotePeer string
 }
 
 func readFrame(r io.Reader) ([]byte, error) {
@@ -281,11 +304,19 @@ func (c *ssh_channel) Service() string {
 	return c.ssh_channelData.Service
 }
 
+func (c *ssh_channel) RemotePeer() string {
+	return c.remotePeer
+}
+
+func (c *ssh_channel) LocalPeer() string {
+	return c.localPeer
+}
+
 func (c *ssh_channel) Join(rwc io.ReadWriteCloser) {
 	go joinChannel(c, rwc)
 }
 
-func ssh_acceptChannels(chans <-chan ssh.NewChannel, peer *Peer) {
+func ssh_acceptChannels(chans <-chan ssh.NewChannel, remotePeer string, peer *Peer) {
 	var meta ssh_channelData
 	for newCh := range chans {
 		switch newCh.ChannelType() {
@@ -306,7 +337,12 @@ func ssh_acceptChannels(chans <-chan ssh.NewChannel, peer *Peer) {
 					return
 				}
 				go ssh.DiscardRequests(reqs)
-				peer.incomingCh <- &ssh_channel{ch, meta}
+				peer.incomingCh <- &ssh_channel{
+					Channel:         ch,
+					ssh_channelData: meta,
+					localPeer:       peer.GetOption(OptName).(string),
+					remotePeer:      remotePeer,
+				}
 			}()
 		}
 	}

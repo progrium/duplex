@@ -28,6 +28,9 @@ type Channel interface {
 type ChannelMeta interface {
 	Service() string
 	Headers() []string
+
+	RemotePeer() string
+	LocalPeer() string
 }
 
 type peerConnection interface {

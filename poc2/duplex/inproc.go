@@ -16,8 +16,8 @@ var inproc_mutex sync.Mutex
 type inproc_peerConnection struct {
 	sync.Mutex
 	identifier string
-	name       string
 	remote     *Peer
+	local      *Peer
 	chans      []*inproc_opened_ch
 }
 
@@ -34,7 +34,7 @@ func (c *inproc_peerConnection) Disconnect() error {
 }
 
 func (c *inproc_peerConnection) Name() string {
-	return c.name
+	return c.remote.GetOption(OptName).(string)
 }
 
 func (c *inproc_peerConnection) Endpoint() string {
@@ -45,12 +45,14 @@ func (c *inproc_peerConnection) Open(service string, headers []string) (Channel,
 	c.Lock()
 	defer c.Unlock()
 	ch := &inproc_opened_ch{
-		service:   service,
-		headers:   headers,
-		framesOut: make(chan []byte, 1024),
-		framesIn:  make(chan []byte, 1024),
-		errorsOut: make(chan []byte, 1024),
-		errorsIn:  make(chan []byte, 1024),
+		service:    service,
+		headers:    headers,
+		framesOut:  make(chan []byte, 1024),
+		framesIn:   make(chan []byte, 1024),
+		errorsOut:  make(chan []byte, 1024),
+		errorsIn:   make(chan []byte, 1024),
+		localPeer:  c.local.GetOption(OptName).(string),
+		remotePeer: c.remote.GetOption(OptName).(string),
 	}
 	c.chans = append(c.chans, ch)
 	c.remote.incomingCh <- &inproc_accepted_ch{ch}
@@ -68,14 +70,14 @@ func newPeerConnection_inproc(peer *Peer, u *url.URL) (peerConnection, error) {
 	remote.conns["inproc://"+peer.GetOption(OptName).(string)] = &inproc_peerConnection{
 		identifier: peer.GetOption(OptName).(string),
 		remote:     peer,
-		name:       peer.GetOption(OptName).(string),
+		local:      remote,
 		chans:      make([]*inproc_opened_ch, 0),
 	}
 	remote.Unlock()
 	return &inproc_peerConnection{
 		identifier: u.Host,
 		remote:     remote,
-		name:       remote.GetOption(OptName).(string),
+		local:      peer,
 		chans:      make([]*inproc_opened_ch, 0),
 	}, nil
 }
@@ -112,17 +114,19 @@ func newPeerListener_inproc(peer *Peer, u *url.URL) (peerListener, error) {
 
 type inproc_opened_ch struct {
 	sync.Mutex
-	service   string
-	headers   []string
-	framesOut chan []byte
-	framesIn  chan []byte
-	errorsOut chan []byte
-	errorsIn  chan []byte
-	bufferOut bytes.Buffer
-	bufferIn  bytes.Buffer
-	eofOut    bool
-	eofIn     bool
-	closed    bool
+	service    string
+	headers    []string
+	framesOut  chan []byte
+	framesIn   chan []byte
+	errorsOut  chan []byte
+	errorsIn   chan []byte
+	bufferOut  bytes.Buffer
+	bufferIn   bytes.Buffer
+	eofOut     bool
+	eofIn      bool
+	closed     bool
+	localPeer  string
+	remotePeer string
 }
 
 func (c *inproc_opened_ch) ReadFrame() ([]byte, error) {
@@ -220,6 +224,14 @@ func (c *inproc_opened_ch) Meta() ChannelMeta {
 	return c
 }
 
+func (c *inproc_opened_ch) LocalPeer() string {
+	return c.localPeer
+}
+
+func (c *inproc_opened_ch) RemotePeer() string {
+	return c.remotePeer
+}
+
 func (c *inproc_opened_ch) Join(rwc io.ReadWriteCloser) {
 	go joinChannel(c, rwc)
 }
@@ -307,6 +319,14 @@ func (c *inproc_accepted_ch) Service() string {
 
 func (c *inproc_accepted_ch) Meta() ChannelMeta {
 	return c.opened
+}
+
+func (c *inproc_accepted_ch) LocalPeer() string {
+	return c.opened.remotePeer
+}
+
+func (c *inproc_accepted_ch) RemotePeer() string {
+	return c.opened.localPeer
 }
 
 func (c *inproc_accepted_ch) Join(rwc io.ReadWriteCloser) {

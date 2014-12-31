@@ -73,9 +73,19 @@ The API has gone through many changes but this is currently what it looks like i
 	}
 
 	type ChannelMeta interface {
+		// Name of service, if any
 		Service() string
+
+		// Headers, often key=vaue
 		Headers() []string
+
+		// Trailers, or "close headers"
+		// Available once closed.
 		Trailers() []string
+
+		// Name of peers
+		LocalPeer() string
+		RemotePeer() string
 	}
 
 	type Channel interface {
@@ -91,10 +101,10 @@ The API has gone through many changes but this is currently what it looks like i
 		WriteError(frame []byte) error
 		ReadError() ([]byte, error)
 
-		// EOF and Close
+		// EOF, Trailers, Close
 		CloseWrite() error
+		WriteTrailers(trailers []string) error
 		Close() error
-		CloseWithTrailers(trailers []string) error
 	
 		// Channels of Channels
 		Open(service string, headers []string) (Channel, error)

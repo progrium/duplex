@@ -2,6 +2,7 @@ package duplex
 
 import (
 	"errors"
+	"log"
 	"math"
 	"math/rand"
 	"net/url"
@@ -13,8 +14,8 @@ import (
 )
 
 const (
-	OptPrivateKey       = iota // filepath string
-	OptAuthorizedKeys          // filepath string
+	OptPrivateKey       = iota // string (filepath)
+	OptAuthorizedKeys          // string (filepath)
 	OptName                    // string
 	OptRetryInterval           // int (milliseconds)
 	OptRetryIntervalMax        // int (milliseconds)
@@ -102,6 +103,7 @@ func (p *Peer) retryConnect(fn peerConnFactory, endpoint *url.URL) (peerConnecti
 			if err == nil {
 				return c, err
 			}
+			log.Println("debug:", err)
 			time.Sleep(time.Duration(delay) * time.Millisecond)
 			delay = r.NormFloat64()*(delay*retryJitter) + delay
 		}
