@@ -8,8 +8,12 @@ import (
 	"sync"
 )
 
-var inproc_listeners = make(map[string]*Peer)
-var inproc_mutex sync.Mutex
+var inproc_listeners = struct {
+	sync.Mutex
+	m map[string]*Peer
+}{
+	m: make(map[string]*Peer),
+}
 
 // inproc connection
 
@@ -21,48 +25,39 @@ type inproc_peerConnection struct {
 	chans      []*inproc_opened_ch
 }
 
-func (c *inproc_peerConnection) Disconnect() error {
-	c.Lock()
-	defer c.Unlock()
-	for _, ch := range c.chans {
+func (pc *inproc_peerConnection) Disconnect() error {
+	pc.Lock()
+	defer pc.Unlock()
+	for _, ch := range pc.chans {
 		ch.Close()
 	}
-	c.remote.Lock()
-	delete(c.remote.conns, "inproc://"+c.identifier)
-	c.remote.Unlock()
+	pc.remote.Lock()
+	delete(pc.remote.conns, "inproc://"+pc.identifier)
+	pc.remote.Unlock()
 	return nil
 }
 
-func (c *inproc_peerConnection) Name() string {
-	return c.remote.GetOption(OptName).(string)
+func (pc *inproc_peerConnection) Name() string {
+	return pc.remote.GetOption(OptName).(string)
 }
 
-func (c *inproc_peerConnection) Endpoint() string {
-	return "inproc://" + c.identifier
+func (pc *inproc_peerConnection) Endpoint() string {
+	return "inproc://" + pc.identifier
 }
 
-func (c *inproc_peerConnection) Open(service string, headers []string) (Channel, error) {
-	c.Lock()
-	defer c.Unlock()
-	ch := &inproc_opened_ch{
-		service:    service,
-		headers:    headers,
-		framesOut:  make(chan []byte, 1024),
-		framesIn:   make(chan []byte, 1024),
-		errorsOut:  make(chan []byte, 1024),
-		errorsIn:   make(chan []byte, 1024),
-		localPeer:  c.local.GetOption(OptName).(string),
-		remotePeer: c.remote.GetOption(OptName).(string),
-	}
-	c.chans = append(c.chans, ch)
-	c.remote.incomingCh <- &inproc_accepted_ch{ch}
+func (pc *inproc_peerConnection) Open(service string, headers []string) (Channel, error) {
+	ch := inproc_newChannel(pc, service, headers)
+	pc.Lock()
+	pc.chans = append(pc.chans, ch)
+	pc.Unlock()
+	pc.remote.incomingCh <- &inproc_accepted_ch{ch}
 	return ch, nil
 }
 
 func newPeerConnection_inproc(peer *Peer, u *url.URL) (peerConnection, error) {
-	inproc_mutex.Lock()
-	defer inproc_mutex.Unlock()
-	remote, ok := inproc_listeners[u.Host]
+	inproc_listeners.Lock()
+	defer inproc_listeners.Unlock()
+	remote, ok := inproc_listeners.m[u.Host]
 	if !ok {
 		return nil, errors.New("no peer listening with this identifier: " + u.Host)
 	}
@@ -88,25 +83,25 @@ type inproc_peerListener struct {
 	identifier string
 }
 
-func (l *inproc_peerListener) Unbind() error {
-	inproc_mutex.Lock()
-	defer inproc_mutex.Unlock()
-	_, ok := inproc_listeners[l.identifier]
+func (pl *inproc_peerListener) Unbind() error {
+	inproc_listeners.Lock()
+	defer inproc_listeners.Unlock()
+	_, ok := inproc_listeners.m[pl.identifier]
 	if !ok {
-		return errors.New("no peer listening with this identifier: " + l.identifier)
+		return errors.New("no peer listening with this identifier: " + pl.identifier)
 	}
-	delete(inproc_listeners, l.identifier)
+	delete(inproc_listeners.m, pl.identifier)
 	return nil
 }
 
 func newPeerListener_inproc(peer *Peer, u *url.URL) (peerListener, error) {
-	inproc_mutex.Lock()
-	defer inproc_mutex.Unlock()
-	_, exists := inproc_listeners[u.Host]
+	inproc_listeners.Lock()
+	defer inproc_listeners.Unlock()
+	_, exists := inproc_listeners.m[u.Host]
 	if exists {
 		return nil, errors.New("peer already listening with identifier: " + u.Host)
 	}
-	inproc_listeners[u.Host] = peer
+	inproc_listeners.m[u.Host] = peer
 	return &inproc_peerListener{u.Host}, nil
 }
 
@@ -114,19 +109,38 @@ func newPeerListener_inproc(peer *Peer, u *url.URL) (peerListener, error) {
 
 type inproc_opened_ch struct {
 	sync.Mutex
-	service    string
-	headers    []string
-	framesOut  chan []byte
-	framesIn   chan []byte
-	errorsOut  chan []byte
-	errorsIn   chan []byte
-	bufferOut  bytes.Buffer
-	bufferIn   bytes.Buffer
-	eofOut     bool
-	eofIn      bool
-	closed     bool
-	localPeer  string
-	remotePeer string
+	service     string
+	headers     []string
+	framesOut   chan []byte
+	framesIn    chan []byte
+	errorsOut   chan []byte
+	errorsIn    chan []byte
+	bufferOut   bytes.Buffer
+	bufferIn    bytes.Buffer
+	eofOut      bool
+	eofIn       bool
+	closed      bool
+	localPeer   string
+	remotePeer  string
+	attachedIn  chan interface{}
+	attachedOut chan interface{}
+	peerConn    *inproc_peerConnection
+}
+
+func inproc_newChannel(pc *inproc_peerConnection, service string, headers []string) *inproc_opened_ch {
+	return &inproc_opened_ch{
+		peerConn:    pc,
+		service:     service,
+		headers:     headers,
+		framesOut:   make(chan []byte, 1024),
+		framesIn:    make(chan []byte, 1024),
+		errorsOut:   make(chan []byte, 1024),
+		errorsIn:    make(chan []byte, 1024),
+		attachedIn:  make(chan interface{}, 1024),
+		attachedOut: make(chan interface{}, 1024),
+		localPeer:   pc.local.GetOption(OptName).(string),
+		remotePeer:  pc.remote.GetOption(OptName).(string),
+	}
 }
 
 func (c *inproc_opened_ch) ReadFrame() ([]byte, error) {
@@ -208,6 +222,8 @@ func (c *inproc_opened_ch) Close() error {
 	}
 	close(c.errorsIn)
 	close(c.errorsOut)
+	close(c.attachedIn)
+	close(c.attachedOut)
 	c.closed = true
 	return nil
 }
@@ -233,7 +249,24 @@ func (c *inproc_opened_ch) RemotePeer() string {
 }
 
 func (c *inproc_opened_ch) Join(rwc io.ReadWriteCloser) {
-	go joinChannel(c, rwc)
+	joinChannel(c, rwc)
+}
+
+func (c *inproc_opened_ch) Accept() (ChannelMeta, Channel) {
+	ch := <-c.attachedIn
+	if ch != nil {
+		return ch.(ChannelMeta), ch.(Channel)
+	}
+	return nil, nil
+}
+
+func (c *inproc_opened_ch) Open(service string, headers []string) (Channel, error) {
+	ch := inproc_newChannel(c.peerConn, service, headers)
+	c.peerConn.Lock()
+	c.peerConn.chans = append(c.peerConn.chans, ch)
+	c.peerConn.Unlock()
+	c.attachedOut <- &inproc_accepted_ch{ch}
+	return ch, nil
 }
 
 type inproc_accepted_ch struct {
@@ -330,5 +363,22 @@ func (c *inproc_accepted_ch) RemotePeer() string {
 }
 
 func (c *inproc_accepted_ch) Join(rwc io.ReadWriteCloser) {
-	go joinChannel(c, rwc)
+	joinChannel(c, rwc)
+}
+
+func (c *inproc_accepted_ch) Accept() (ChannelMeta, Channel) {
+	ch := <-c.opened.attachedOut
+	if ch != nil {
+		return ch.(ChannelMeta), ch.(Channel)
+	}
+	return nil, nil
+}
+
+func (c *inproc_accepted_ch) Open(service string, headers []string) (Channel, error) {
+	ch := inproc_newChannel(c.opened.peerConn, service, headers)
+	c.opened.peerConn.Lock()
+	c.opened.peerConn.chans = append(c.opened.peerConn.chans, ch)
+	c.opened.peerConn.Unlock()
+	c.opened.attachedIn <- &inproc_accepted_ch{ch}
+	return ch, nil
 }

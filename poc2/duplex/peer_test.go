@@ -237,3 +237,51 @@ func TestBalancedFrameChannels(t *testing.T) {
 		}
 	}
 }
+
+func TestAttachedChannels(t *testing.T) {
+	// two peers, we open a channel in both directions ...
+	// then open a channel on that channel!
+	for _, uri := range transportBaseUris {
+		server := NewPeer()
+		client := NewPeer()
+		defer shutdownPeer(t, server)
+		defer shutdownPeer(t, client)
+		// connect up the peers
+		err := server.Bind(uri + "1")
+		if err != nil {
+			t.Fatal(f(uri), err)
+		}
+		err = client.Connect(uri + "1")
+		if err != nil {
+			t.Fatal(f(uri), err)
+		}
+		for i := 0; i < 2; i++ {
+			// open a channel on one peer
+			opened, err := server.Open(client.GetOption(OptName).(string), "outer", nil)
+			if err != nil {
+				t.Fatal(f(uri), err)
+			}
+			// accept it on the other peer
+			_, accepted := client.Accept()
+			for ii := 0; ii < 2; ii++ {
+				// open channel from accepted end to opened
+				_, err := accepted.Open("inner", []string{"foo=bar", "bar=foo"})
+				if err != nil {
+					t.Fatal(f(uri), err)
+				}
+				// accept it on opened end
+				meta, _ := opened.Accept()
+				if meta.Service() != "inner" {
+					t.Fatal(f(uri), "unexpected service on accepted channel:", meta.Service())
+				}
+				if len(meta.Headers()) != 2 {
+					t.Fatal(f(uri), "unexpected headers on accepted channel:", meta.Headers())
+				}
+				// switch it up on inner level!
+				accepted, opened = opened, accepted
+			}
+			// switch it up on outer level!
+			client, server = server, client
+		}
+	}
+}

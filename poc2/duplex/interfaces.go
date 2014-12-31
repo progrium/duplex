@@ -17,8 +17,8 @@ type Channel interface {
 	CloseWrite() error // send_end .. close_send?
 	Close() error      // close
 
-	//Open(chType, service string, headers []string) (Channel, error) // send_chan
-	//Accept(chType string) (ChannelMeta, Channel)                    // recv_chan
+	Open(service string, headers []string) (Channel, error) // send_chan
+	Accept() (ChannelMeta, Channel)                         // recv_chan
 
 	Join(rwc io.ReadWriteCloser) // join(fd)
 

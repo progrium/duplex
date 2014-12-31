@@ -35,11 +35,14 @@ func loadPrivateKey(path string) (ssh.Signer, error) {
 
 type ssh_greetingPayload struct {
 	Name string
+	// TODO: version?
 }
 
 type ssh_channelData struct {
-	Service string
-	Headers []string
+	Service      string
+	Headers      []string
+	FlagAttached bool // TODO: bitmask
+	Attach       uint32
 }
 
 // ssh listener
@@ -59,10 +62,11 @@ func (l *ssh_peerListener) Unbind() error {
 // ssh connection
 
 type ssh_peerConnection struct {
-	endpoint string
-	remote   string
-	conn     ssh.Conn
-	local    string
+	conn       ssh.Conn
+	endpoint   string
+	remote     string
+	local      string
+	attachedCh map[uint32]chan interface{}
 }
 
 func (c *ssh_peerConnection) Disconnect() error {
@@ -78,21 +82,7 @@ func (c *ssh_peerConnection) Endpoint() string {
 }
 
 func (c *ssh_peerConnection) Open(service string, headers []string) (Channel, error) {
-	meta := ssh_channelData{
-		Service: service,
-		Headers: headers,
-	}
-	ch, reqs, err := c.conn.OpenChannel("@duplex", ssh.Marshal(meta))
-	if err != nil {
-		return nil, err
-	}
-	go ssh.DiscardRequests(reqs)
-	return &ssh_channel{
-		Channel:         ch,
-		ssh_channelData: meta,
-		localPeer:       c.local,
-		remotePeer:      c.remote,
-	}, nil
+	return ssh_openChannel(c, service, headers, false, 0)
 }
 
 // ssh server
@@ -152,14 +142,15 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 		// peer name when we don't have a remote address.
 		endpoint = conn.RemoteAddr().Network() + "://" + sshConn.User()
 	}
-	localPeer := peer.GetOption(OptName).(string)
-	peer.Lock()
-	peer.conns[endpoint] = &ssh_peerConnection{
-		endpoint: endpoint,
-		remote:   sshConn.User(),
-		conn:     sshConn,
-		local:    localPeer,
+	pc := &ssh_peerConnection{
+		endpoint:   endpoint,
+		remote:     sshConn.User(),
+		conn:       sshConn,
+		local:      peer.GetOption(OptName).(string),
+		attachedCh: make(map[uint32]chan interface{}),
 	}
+	peer.Lock()
+	peer.conns[endpoint] = pc
 	peer.Unlock()
 	go func() {
 		sshConn.Wait()
@@ -175,7 +166,7 @@ func ssh_handleConn(conn net.Conn, config *ssh.ServerConfig, peer *Peer) {
 		}
 		return
 	}
-	ssh_acceptChannels(chans, sshConn.User(), peer)
+	ssh_acceptChannels(chans, pc, peer)
 }
 
 // ssh client
@@ -233,13 +224,15 @@ func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
 		//log.Println("debug: client disconnection: ", err)
 		// TODO: handle unexpected disconnect
 	}()
-	go ssh_acceptChannels(chans, name, peer)
-	return &ssh_peerConnection{
-		endpoint: u.String(),
-		remote:   name,
-		conn:     conn,
-		local:    peer.GetOption(OptName).(string),
-	}, nil
+	pc := &ssh_peerConnection{
+		endpoint:   u.String(),
+		remote:     name,
+		conn:       conn,
+		local:      peer.GetOption(OptName).(string),
+		attachedCh: make(map[uint32]chan interface{}),
+	}
+	go ssh_acceptChannels(chans, pc, peer)
+	return pc, nil
 }
 
 // channels
@@ -247,8 +240,7 @@ func newPeerConnection_ssh(peer *Peer, u *url.URL) (peerConnection, error) {
 type ssh_channel struct {
 	ssh.Channel
 	ssh_channelData
-	localPeer  string
-	remotePeer string
+	peerConn *ssh_peerConnection
 }
 
 func readFrame(r io.Reader) ([]byte, error) {
@@ -305,18 +297,54 @@ func (c *ssh_channel) Service() string {
 }
 
 func (c *ssh_channel) RemotePeer() string {
-	return c.remotePeer
+	return c.peerConn.remote
 }
 
 func (c *ssh_channel) LocalPeer() string {
-	return c.localPeer
+	return c.peerConn.local
 }
 
 func (c *ssh_channel) Join(rwc io.ReadWriteCloser) {
-	go joinChannel(c, rwc)
+	joinChannel(c, rwc)
 }
 
-func ssh_acceptChannels(chans <-chan ssh.NewChannel, remotePeer string, peer *Peer) {
+func (c *ssh_channel) Accept() (ChannelMeta, Channel) {
+	attached, exists := c.peerConn.attachedCh[c.Channel.LocalID()]
+	if !exists {
+		panic("attached chan for channel does not exist")
+	}
+	ch := <-attached
+	if ch != nil {
+		return ch.(ChannelMeta), ch.(Channel)
+	}
+	return nil, nil
+}
+
+func (c *ssh_channel) Open(service string, headers []string) (Channel, error) {
+	return ssh_openChannel(c.peerConn, service, headers, true, c.Channel.RemoteID())
+}
+
+func ssh_openChannel(peerConn *ssh_peerConnection, service string, headers []string, attached bool, attach uint32) (Channel, error) {
+	meta := ssh_channelData{
+		Service:      service,
+		Headers:      headers,
+		FlagAttached: attached,
+		Attach:       attach,
+	}
+	ch, reqs, err := peerConn.conn.OpenChannel("@duplex", ssh.Marshal(meta))
+	if err != nil {
+		return nil, err
+	}
+	go ssh.DiscardRequests(reqs)
+	peerConn.attachedCh[ch.LocalID()] = make(chan interface{}, 1024)
+	return &ssh_channel{
+		Channel:         ch,
+		ssh_channelData: meta,
+		peerConn:        peerConn,
+	}, nil
+}
+
+func ssh_acceptChannels(chans <-chan ssh.NewChannel, peerConn *ssh_peerConnection, peer *Peer) {
 	var meta ssh_channelData
 	for newCh := range chans {
 		switch newCh.ChannelType() {
@@ -327,22 +355,24 @@ func ssh_acceptChannels(chans <-chan ssh.NewChannel, remotePeer string, peer *Pe
 					newCh.Reject(ssh.UnknownChannelType, "failed to parse channel data")
 					return
 				}
-				if meta.Service == "" {
-					newCh.Reject(ssh.UnknownChannelType, "empty service")
-					return
-				}
 				ch, reqs, err := newCh.Accept()
 				if err != nil {
 					log.Println("debug: accept error:", err)
 					return
 				}
 				go ssh.DiscardRequests(reqs)
-				peer.incomingCh <- &ssh_channel{
+				peerConn.attachedCh[ch.LocalID()] = make(chan interface{}, 1024)
+				duplexChan := &ssh_channel{
 					Channel:         ch,
 					ssh_channelData: meta,
-					localPeer:       peer.GetOption(OptName).(string),
-					remotePeer:      remotePeer,
+					peerConn:        peerConn,
 				}
+				if meta.FlagAttached {
+					peerConn.attachedCh[meta.Attach] <- duplexChan
+				} else {
+					peer.incomingCh <- duplexChan
+				}
+
 			}()
 		}
 	}
