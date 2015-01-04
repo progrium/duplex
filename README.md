@@ -22,28 +22,6 @@ This is a work in progress, but is focusing on the Go implementation. The goal i
 
 Once PoC2 is finished, the plan is again to port to C, using an existing SSH implementation as a foundation. Perhaps libssh. Again, the ultimate goal is to have a C library implementation. 
 
-## Architecture
-
-#### Peers and Channels
-
-The main primitives in Duplex are Peers and Channels. Peers are like advanced sockets that can connect and be connected to. They most closely resemble ZeroMQ sockets. Behind the scenes they are both an SSH server and client up to the SSH Connection Layer. There's no terminals or shelling out here, we just use the lower level protocols that give us encrypted, bi-directional, multiplexed streams. These streams are exposed as Channels. 
-
-Channels are much closer to a regular socket connection, but are tunneled through the secure connections between Peers. Unlike regular TCP connections, Channels come with some metadata, including their intended service and key-value headers. The Channel API has basic send/recv calls, but also calls for sending and receiving message frames. It also utilizes what SSH would use for stderr to send error frames. 
-
-Frames are just length prefixed payloads of bytes. Frames can go in either direction. This is a solid foundation for any application protocol. What's more, you can send Channels over Channels. Just think about that.
-
-#### RPC Layer
-
-All that is really a foundation for a flexible, streaming RPC layer. Since different languages will have their own idiomatic way of exposing RPC clients and servers around Duplex, the RPC layer is not in the core library. All the RPC layer does is provide a natural interface to calling and exposing functions as RPC services. An RPC service is a function that can take some input (zero or more objects) and can produce some output (zero or more objects). 
-
-Objects are typed structures marshalled by your codec of choice, whether it's msgpack or protobufs. These serialized objects are then sent as frames over Duplex Channels. When Channels are opened, they pass a codec header that allows the other end to know how it should serialize objects. You could even support multiple codecs at once. 
-
-Like ZeroMQ sockets, Peers let you connect up topologies however you want. Both ends are clients and servers. You can also connect multiple Peers together. At the RPC layer, it will round-robin requests over multiple remote Peers.
-
-#### Plugin Architectures
-
-The heart of any plugin system is usually hooks or "delegate" APIs plugin authors implement. Duplex RPC is ideal for this since its goal is to be available in all languages and will always include both server and client. Since it's bi-directional, it also supports callbacks and other advanced RPC mechanisms. All this while not forcing data types or weird message patterns on you. On top of that, because it's made for TCP, you can allow networked/distributed plugins. 
-
 ## API
 
 The API has gone through many changes but this is currently what it looks like in rough form, written as Go interfaces.
@@ -116,6 +94,30 @@ The API has gone through many changes but this is currently what it looks like i
 		// Reference to ChannelMeta
 		Meta() ChannelMeta
 	}
+
+
+## Architecture
+
+#### Peers and Channels
+
+The main primitives in Duplex are Peers and Channels. Peers are like advanced sockets that can connect and be connected to. They most closely resemble ZeroMQ sockets. Behind the scenes they are both an SSH server and client up to the SSH Connection Layer. There's no terminals or shelling out here, we just use the lower level protocols that give us encrypted, bi-directional, multiplexed streams. These streams are exposed as Channels. 
+
+Channels are much closer to a regular socket connection, but are tunneled through the secure connections between Peers. Unlike regular TCP connections, Channels come with some metadata, including their intended service and key-value headers. The Channel API has basic send/recv calls, but also calls for sending and receiving message frames. It also utilizes what SSH would use for stderr to send error frames. 
+
+Frames are just length prefixed payloads of bytes. Frames can go in either direction. This is a solid foundation for any application protocol. What's more, you can send Channels over Channels. Just think about that.
+
+#### RPC Layer
+
+All that is really a foundation for a flexible, streaming RPC layer. Since different languages will have their own idiomatic way of exposing RPC clients and servers around Duplex, the RPC layer is not in the core library. All the RPC layer does is provide a natural interface to calling and exposing functions as RPC services. An RPC service is a function that can take some input (zero or more objects) and can produce some output (zero or more objects). 
+
+Objects are typed structures marshalled by your codec of choice, whether it's msgpack or protobufs. These serialized objects are then sent as frames over Duplex Channels. When Channels are opened, they pass a codec header that allows the other end to know how it should serialize objects. You could even support multiple codecs at once. 
+
+Like ZeroMQ sockets, Peers let you connect up topologies however you want. Both ends are clients and servers. You can also connect multiple Peers together. At the RPC layer, it will round-robin requests over multiple remote Peers.
+
+#### Plugin Architectures
+
+The heart of any plugin system is usually hooks or "delegate" APIs plugin authors implement. Duplex RPC is ideal for this since its goal is to be available in all languages and will always include both server and client. Since it's bi-directional, it also supports callbacks and other advanced RPC mechanisms. All this while not forcing data types or weird message patterns on you. On top of that, because it's made for TCP, you can allow networked/distributed plugins. 
+
 
 ## License
 
