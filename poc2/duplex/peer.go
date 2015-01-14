@@ -68,8 +68,6 @@ func (p *Peer) Bind(endpoint string) error {
 	switch u.Scheme {
 	case "tcp", "unix":
 		l, err = newPeerListener_ssh(p, u)
-	case "inproc":
-		l, err = newPeerListener_inproc(p, u)
 	default:
 		return errors.New("duplex: unknown endpoint type: " + u.Scheme)
 	}
@@ -139,8 +137,6 @@ func (p *Peer) Connect(endpoint string) error {
 	switch u.Scheme {
 	case "tcp", "unix":
 		c, err = p.retryConnect(newPeerConnection_ssh, u)
-	case "inproc":
-		c, err = newPeerConnection_inproc(p, u)
 	default:
 		return errors.New("duplex: unknown endpoint type: " + u.Scheme)
 	}

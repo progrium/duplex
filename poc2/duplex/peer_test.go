@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var transportBaseUris = []string{"inproc://test-", "unix:///tmp/test.", "tcp://127.0.0.1:666"}
+var transportBaseUris = []string{"unix:///tmp/test.", "tcp://127.0.0.1:666"}
 
 func shutdownPeer(t *testing.T, peer *Peer) {
 	err := peer.Shutdown()
