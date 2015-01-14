@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var transportBaseUris = []string{"inproc://test-", "unix:///tmp/test.", "tcp://127.0.0.1:666"}
+var transportBaseUris = []string{"unix:///tmp/test.", "tcp://127.0.0.1:666"}
 
 func shutdownPeer(t *testing.T, peer *Peer) {
 	err := peer.Shutdown()
@@ -157,6 +157,65 @@ func TestOpenChannels(t *testing.T) {
 			client, server = server, client
 		}
 	}
+}
+
+func TestChannelTrailers(t *testing.T) {
+	// two channels, send trailers to each other
+	for _, uri := range transportBaseUris {
+		server := NewPeer()
+		client := NewPeer()
+		defer shutdownPeer(t, server)
+		defer shutdownPeer(t, client)
+		// connect up the peers
+		err := server.Bind(uri + "1")
+		if err != nil {
+			t.Fatal(f(uri), err)
+		}
+		err = client.Connect(uri + "1")
+		if err != nil {
+			t.Fatal(f(uri), err)
+		}
+		for i := 0; i < 2; i++ {
+			// open a channel on one peer
+			chs, err := server.Open(client.GetOption(OptName).(string), "test-service", []string{"foo=bar"})
+			if err != nil {
+				t.Fatal(f(uri), err)
+			}
+			// accept it on the other peer
+			meta, chc := client.Accept()
+			if meta.Service() != "test-service" {
+				t.Fatal(f(uri), "unexpected service on accepted channel:", meta.Service())
+			}
+			if len(meta.Headers()) != 1 {
+				t.Fatal(f(uri), "unexpected headers on accepted channel:", meta.Headers())
+			}
+			// write trailers
+			if err := chs.WriteTrailers([]string{"trailer is here"}); err != nil {
+				t.Fatal(f(uri), "failed to write trailers on open channel:", err)
+			}
+			if len(chs.Meta().Trailers()) != 1 || chs.Meta().Trailers()[0] != "trailer is here" {
+				t.Fatal(f(uri), "unexpected trailers on open channel:", chs.Meta().Trailers())
+			}
+			if len(chc.Meta().Trailers()) != 1 || chc.Meta().Trailers()[0] != "trailer is here" {
+				t.Fatal(f(uri), "unexpected trailers on accepted channel:", chc.Meta().Trailers())
+			}
+
+			// write other trailers
+			if err := chc.WriteTrailers([]string{"client trailer", "is here"}); err != nil {
+				t.Fatal(f(uri), "failed to write trailers on accepted channel:", err)
+			}
+			if len(chs.Meta().Trailers()) != 2 || chs.Meta().Trailers()[0] != "client trailer" || chs.Meta().Trailers()[1] != "is here" {
+				t.Fatal(f(uri), "unexpected trailers on open channel:", chs.Meta().Trailers())
+			}
+			if len(chc.Meta().Trailers()) != 2 || chc.Meta().Trailers()[0] != "client trailer" || chc.Meta().Trailers()[1] != "is here" {
+				t.Fatal(f(uri), "unexpected trailers on accepted channel:", chc.Meta().Trailers())
+			}
+
+			// switch it up!
+			client, server = server, client
+		}
+	}
+
 }
 
 func TestBalancedFrameChannels(t *testing.T) {
