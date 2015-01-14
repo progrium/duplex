@@ -37,11 +37,16 @@ type ssh_greetingPayload struct {
 	// TODO: version?
 }
 
+type ssh_trailerPayload struct {
+	Trailers []string
+}
+
 type ssh_channelData struct {
 	Service      string
 	Headers      []string
 	FlagAttached bool // TODO: bitmask
 	Attach       uint32
+	Trailers     []string
 }
 
 // ssh listener
@@ -283,6 +288,16 @@ func (c *ssh_channel) WriteError(frame []byte) error {
 	return writeFrame(c.Stderr(), frame)
 }
 
+func (c *ssh_channel) WriteTrailers(trailers []string) error {
+	if ok, err := c.SendRequest("trailers", true, ssh.Marshal(ssh_trailerPayload{
+		Trailers: trailers,
+	})); err != nil || !ok {
+		return errors.New("unable to set trailers")
+	}
+	c.ssh_channelData.Trailers = trailers
+	return nil
+}
+
 func (c *ssh_channel) Meta() ChannelMeta {
 	return c
 }
@@ -293,6 +308,10 @@ func (c *ssh_channel) Headers() []string {
 
 func (c *ssh_channel) Service() string {
 	return c.ssh_channelData.Service
+}
+
+func (c *ssh_channel) Trailers() []string {
+	return c.ssh_channelData.Trailers
 }
 
 func (c *ssh_channel) RemotePeer() string {
@@ -323,6 +342,27 @@ func (c *ssh_channel) Open(service string, headers []string) (Channel, error) {
 	return ssh_openChannel(c.peerConn, service, headers, true, c.Channel.RemoteID())
 }
 
+func (c *ssh_channel) handleRequests(in <-chan *ssh.Request) {
+	for req := range in {
+		switch req.Type {
+		case "trailers":
+			var trailers ssh_trailerPayload
+			if err := ssh.Unmarshal(req.Payload, &trailers); err != nil {
+				req.Reply(false, nil)
+			}
+
+			c.ssh_channelData.Trailers = trailers.Trailers
+
+			req.Reply(true, nil)
+
+		default:
+			if req.WantReply {
+				req.Reply(false, nil)
+			}
+		}
+	}
+}
+
 func ssh_openChannel(peerConn *ssh_peerConnection, service string, headers []string, attached bool, attach uint32) (Channel, error) {
 	meta := ssh_channelData{
 		Service:      service,
@@ -334,13 +374,16 @@ func ssh_openChannel(peerConn *ssh_peerConnection, service string, headers []str
 	if err != nil {
 		return nil, err
 	}
-	go ssh.DiscardRequests(reqs)
 	peerConn.attachedCh[ch.LocalID()] = make(chan interface{}, 1024)
-	return &ssh_channel{
+	channel := &ssh_channel{
 		Channel:         ch,
 		ssh_channelData: meta,
 		peerConn:        peerConn,
-	}, nil
+	}
+
+	go channel.handleRequests(reqs)
+
+	return channel, nil
 }
 
 func ssh_acceptChannels(chans <-chan ssh.NewChannel, peerConn *ssh_peerConnection, peer *Peer) {
@@ -359,13 +402,15 @@ func ssh_acceptChannels(chans <-chan ssh.NewChannel, peerConn *ssh_peerConnectio
 					debug("accept error:", err)
 					return
 				}
-				go ssh.DiscardRequests(reqs)
 				peerConn.attachedCh[ch.LocalID()] = make(chan interface{}, 1024)
 				duplexChan := &ssh_channel{
 					Channel:         ch,
 					ssh_channelData: meta,
 					peerConn:        peerConn,
 				}
+
+				go duplexChan.handleRequests(reqs)
+
 				if meta.FlagAttached {
 					peerConn.attachedCh[meta.Attach] <- duplexChan
 				} else {

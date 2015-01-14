@@ -14,8 +14,9 @@ type Channel interface {
 	WriteError(data []byte) error // send_error
 	ReadError() ([]byte, error)   // recv_error
 
-	CloseWrite() error // send_end .. close_send?
-	Close() error      // close
+	CloseWrite() error                     // send_end .. close_send?
+	WriteTrailers(trailers []string) error // send_trailers
+	Close() error                          // close
 
 	Open(service string, headers []string) (Channel, error) // send_chan
 	Accept() (ChannelMeta, Channel)                         // recv_chan
@@ -28,6 +29,8 @@ type Channel interface {
 type ChannelMeta interface {
 	Service() string
 	Headers() []string
+
+	Trailers() []string
 
 	RemotePeer() string
 	LocalPeer() string
