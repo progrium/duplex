@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net"
 	"sync"
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 
 	"github.com/ugorji/go/codec"
 )
