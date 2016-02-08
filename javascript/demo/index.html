@@ -1,0 +1,28 @@
+<html>
+<head>
+  <script src="/simplex.js"></script>
+</head>
+<body>
+  Open dev console...
+  <script>
+    var peer
+    var rpc = new simplex.RPC(simplex.JSON)
+    rpc.register("msgbox", function(ch) {
+      ch.onrecv = function(text) {
+        peer.ext = ch.ext
+        alert(text)
+      }
+    })
+    var ws = new WebSocket("ws://localhost:8001/")
+    ws.onopen = function() {
+      rpc.handshake(simplex.wrap.websocket(ws), function(p) {
+        peer = p
+        peer.call("echo", {foo: "bar"}, function(reply) {
+          console.log(reply)
+        })
+        peer.call("doMsgbox", "Client called doMsgbox() on server, server called msgbox() on client.")
+      })
+    }
+  </script>
+</body>
+</html>
