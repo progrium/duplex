@@ -1,15 +1,15 @@
 var ws = require("nodejs-websocket")
-var simplex = require("../dist/simplex.js").simplex
+var duplex = require("../dist/duplex.js").duplex
 var http = require('http');
 var fs = require('fs');
 var index = fs.readFileSync('index.html');
-var simplexjs = fs.readFileSync('../dist/simplex.js');
+var duplexjs = fs.readFileSync('../dist/duplex.js');
 
 // SERVE FILES
 http.createServer(function (req, res) {
-  if (req.url == "/simplex.js") {
+  if (req.url == "/duplex.js") {
     res.writeHead(200, {'Content-Type': 'text/javascript'});
-    res.end(simplexjs);
+    res.end(duplexjs);
   } else {
     res.writeHead(200, {'Content-Type': 'text/html'});
     res.end(index);
@@ -18,7 +18,7 @@ http.createServer(function (req, res) {
 console.log("HTTP on 8000...")
 
 // SETUP RPC
-var rpc = new simplex.RPC(simplex.JSON)
+var rpc = new duplex.RPC(duplex.JSON)
 rpc.register("echo", function(ch) {
   ch.onrecv = function(obj) {
     ch.send(obj)
@@ -32,6 +32,6 @@ rpc.register("doMsgbox", function(ch) {
 
 // WEBSOCKET SERVER
 var server = ws.createServer(function (conn) {
-  rpc.accept(simplex.wrap["nodejs-websocket"](conn))
+  rpc.accept(duplex.wrap["nodejs-websocket"](conn))
 }).listen(8001)
 console.log("WS on 8001...")

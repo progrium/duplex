@@ -1,10 +1,13 @@
 {
-  "name": "simplex",
+  "name": "duplex",
+  "description": "Full duplex RPC and service framework",
+  "license": "MIT",
+  "repository": "https://github.com/progrium/duplex",
   "version": "0.1.0",
   "devDependencies" : {
     "jasmine-node": "*",
     "atob": "*",
     "btoa": "*"
   },
-  "main": "./dist/simplex.js"
+  "main": "./dist/duplex.js"
 }

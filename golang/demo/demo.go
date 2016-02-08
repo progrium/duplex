@@ -5,21 +5,21 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/progrium/simplex/golang"
+	"github.com/progrium/duplex/golang"
 	"golang.org/x/net/websocket"
 )
 
-var rpc = simplex.NewRPC(simplex.NewJSONCodec())
+var rpc = duplex.NewRPC(duplex.NewJSONCodec())
 
 func init() {
-	rpc.Register("echo", func(ch *simplex.Channel) error {
+	rpc.Register("echo", func(ch *duplex.Channel) error {
 		var obj interface{}
 		if _, err := ch.Recv(&obj); err != nil {
 			return err
 		}
 		return ch.Send(obj, false)
 	})
-	rpc.Register("doMsgbox", func(ch *simplex.Channel) error {
+	rpc.Register("doMsgbox", func(ch *duplex.Channel) error {
 		var text string
 		if _, err := ch.Recv(&text); err != nil {
 			return err
@@ -39,8 +39,8 @@ func WebsocketServer(ws *websocket.Conn) {
 }
 
 func main() {
-	http.HandleFunc("/simplex.js", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "../../javascript/dist/simplex.js")
+	http.HandleFunc("/duplex.js", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "../../javascript/dist/duplex.js")
 	})
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "../../javascript/demo/index.html")

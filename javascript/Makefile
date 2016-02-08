@@ -8,3 +8,6 @@ test: build
 
 demo: build
 	cd demo && node server.js
+
+dev:
+	npm install

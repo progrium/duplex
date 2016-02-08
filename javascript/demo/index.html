@@ -1,12 +1,12 @@
 <html>
 <head>
-  <script src="/simplex.js"></script>
+  <script src="/duplex.js"></script>
 </head>
 <body>
   Open dev console...
   <script>
     var peer
-    var rpc = new simplex.RPC(simplex.JSON)
+    var rpc = new duplex.RPC(duplex.JSON)
     rpc.register("msgbox", function(ch) {
       ch.onrecv = function(text) {
         peer.ext = ch.ext
@@ -15,7 +15,7 @@
     })
     var ws = new WebSocket("ws://localhost:8001/")
     ws.onopen = function() {
-      rpc.handshake(simplex.wrap.websocket(ws), function(p) {
+      rpc.handshake(duplex.wrap.websocket(ws), function(p) {
         peer = p
         peer.call("echo", {foo: "bar"}, function(reply) {
           console.log(reply)

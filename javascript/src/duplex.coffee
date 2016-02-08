@@ -5,7 +5,7 @@ assert = (description, condition=false) ->
   # HOWEVER in development there are asserts instead of exceptions...
   throw Error "Assertion: #{description}" if not condition
 
-simplex =
+duplex =
   version: "0.1.0"
   protocol:
     name: "SIMPLEX"
@@ -40,7 +40,7 @@ simplex =
 
 requestMsg = (payload, method, id, more, ext) ->
   msg =
-    type: simplex.request
+    type: duplex.request
     method: method
     payload: payload
   if id?
@@ -53,7 +53,7 @@ requestMsg = (payload, method, id, more, ext) ->
 
 replyMsg = (id, payload, more, ext) ->
   msg =
-    type: simplex.reply
+    type: duplex.reply
     id: id
     payload: payload
   if more == true
@@ -64,7 +64,7 @@ replyMsg = (id, payload, more, ext) ->
 
 errorMsg = (id, code, message, data, ext)->
   msg =
-    type: simplex.reply
+    type: duplex.reply
     id: id
     error:
       code: code
@@ -76,7 +76,7 @@ errorMsg = (id, code, message, data, ext)->
   msg
 
 
-class simplex.RPC
+class duplex.RPC
   constructor: (@codec)->
     @encode = @codec[1]
     @decode = @codec[2]
@@ -86,11 +86,11 @@ class simplex.RPC
     @registered[method] = func
 
   _handshake: ->
-    p = simplex.protocol
+    p = duplex.protocol
     "#{p.name}/#{p.version};#{@codec[0]}"
 
   handshake: (conn, onready) ->
-    peer = new simplex.Peer(this, conn, onready)
+    peer = new duplex.Peer(this, conn, onready)
     conn.onrecv = (data) ->
       if data[0] == "+"
         conn.onrecv = peer.onrecv
@@ -101,15 +101,15 @@ class simplex.RPC
     peer
 
   accept: (conn, onready) ->
-    peer = new simplex.Peer(this, conn, onready)
+    peer = new duplex.Peer(this, conn, onready)
     conn.onrecv = (data) ->
       # TODO: check handshake
       conn.onrecv = peer.onrecv
-      conn.send(simplex.handshake.accept)
+      conn.send(duplex.handshake.accept)
       peer._ready(peer)
     peer
 
-class simplex.Peer
+class duplex.Peer
   constructor: (@rpc, @conn, @onready=->) ->
     assert "Peer expects an RPC", @rpc.constructor.name == "RPC"
     assert "Peer expects a connection", @conn?
@@ -125,7 +125,7 @@ class simplex.Peer
     @conn.close()
 
   call: (method, args, onreply) ->
-    ch = new simplex.Channel(this, simplex.request, method, @ext)
+    ch = new duplex.Channel(this, duplex.request, method, @ext)
     if onreply?
       ch.id = ++@lastId
       ch.onrecv = onreply
@@ -133,7 +133,7 @@ class simplex.Peer
     ch.send(args)
 
   open: (method, onreply) ->
-    ch = new simplex.Channel(this, simplex.request, method, @ext)
+    ch = new duplex.Channel(this, duplex.request, method, @ext)
     ch.id = ++@lastId
     @repChan[ch.id] = ch
     if onreply?
@@ -144,13 +144,13 @@ class simplex.Peer
     msg = @rpc.decode(frame)
     # TODO: catch decode error
     switch msg.type
-      when simplex.request
+      when duplex.request
         if @reqChan[msg.id]?
           ch = @reqChan[msg.id]
           if msg.more == false
             delete @reqChan[msg.id]
         else
-          ch = new simplex.Channel(this, simplex.reply, msg.method)
+          ch = new duplex.Channel(this, duplex.reply, msg.method)
           if msg.id != undefined
             ch.id = msg.id
             if msg.more == true
@@ -160,7 +160,7 @@ class simplex.Peer
         if msg.ext?
           ch.ext = msg.ext
         ch.onrecv(msg.payload, msg.more)
-      when simplex.reply
+      when duplex.reply
         if msg.error?
           @repChan[msg.id].onerr msg.error
           delete @repChan[msg.id]
@@ -171,7 +171,7 @@ class simplex.Peer
       else
         assert "Invalid message"
 
-class simplex.Channel
+class duplex.Channel
   constructor: (@peer, @type, @method, @ext) ->
     assert "Channel expects Peer", @peer.constructor.name == "Peer"
     @id = null
@@ -191,23 +191,23 @@ class simplex.Channel
 
   send: (payload, more=false) ->
     switch @type
-      when simplex.request
+      when duplex.request
         @peer.conn.send @peer.rpc.encode(
           requestMsg(payload, @method, @id, more, @ext))
-      when simplex.reply
+      when duplex.reply
         @peer.conn.send @peer.rpc.encode(
           replyMsg(@id, payload, more, @ext))
       else
         assert "Bad channel type"
 
   senderr: (code, message, data) ->
-    assert "Not reply channel", @type != simplex.reply
+    assert "Not reply channel", @type != duplex.reply
     @peer.conn.send @peer.rpc.encode(
       errorMsg(@id, code, message, data, @context))
 
 if window?
   # For use in the browser
-  window.simplex = simplex
+  window.duplex = duplex
 else
   # For Node / testing
-  exports.simplex = simplex
+  exports.duplex = duplex

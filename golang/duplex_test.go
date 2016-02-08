@@ -1,4 +1,4 @@
-package simplex
+package duplex
 
 import (
 	"bytes"

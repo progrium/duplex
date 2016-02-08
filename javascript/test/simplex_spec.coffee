@@ -1,4 +1,4 @@
-{simplex} = require('../dist/simplex.js')
+{duplex} = require('../dist/duplex.js')
 btoa = require('btoa')
 atob = require('atob')
 
@@ -48,7 +48,7 @@ peerPair = (rpc, onready) ->
 
 
 handshake = (codec) ->
-  p = simplex.protocol
+  p = duplex.protocol
   "#{p.name}/#{p.version};#{codec}"
 
 testServices =
@@ -73,32 +73,32 @@ b64json = [
   (str) -> JSON.parse(atob(str))
 ]
 
-describe "simplex module", ->
+describe "duplex module", ->
   it "has a version", ->
-    expect(simplex.version).toBeDefined()
+    expect(duplex.version).toBeDefined()
 
 describe "simple RPC", ->
   it "handshakes", ->
     conn = new MockConnection()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.handshake conn, ->
       expect(conn.sent[0]).toEqual handshake("json")
 
   it "accepts handshakes", ->
     conn = new MockConnection()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.accept(conn)
     conn._recv handshake("json")
-    expect(conn.sent[0]).toEqual simplex.handshake.accept
+    expect(conn.sent[0]).toEqual duplex.handshake.accept
 
   it "handles registered function calls after accept", ->
     conn = new MockConnection()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.register("echo", testServices.echo)
     rpc.accept(conn)
     conn._recv handshake("json")
     req =
-      type: simplex.request
+      type: duplex.request
       method: "echo"
       id: 1
       payload:
@@ -106,19 +106,19 @@ describe "simple RPC", ->
     conn._recv JSON.stringify(req)
     expect(conn.sent.length).toEqual 2
     expect(JSON.parse(conn.sent[1])).toEqual
-      type: simplex.reply
+      type: duplex.reply
       id: 1
       payload:
         foo: "bar"
 
   it "handles registered function calls after handshake", ->
     conn = new MockConnection()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.register("echo", testServices.echo)
     peer = rpc.handshake(conn)
-    conn._recv simplex.handshake.accept
+    conn._recv duplex.handshake.accept
     req =
-      type: simplex.request
+      type: duplex.request
       method: "echo"
       id: 1
       payload:
@@ -126,16 +126,16 @@ describe "simple RPC", ->
     conn._recv JSON.stringify(req)
     expect(conn.sent.length).toEqual 2
     expect(JSON.parse(conn.sent[1])).toEqual
-      type: simplex.reply
+      type: duplex.reply
       id: 1
       payload:
         foo: "bar"
 
   it "calls remote peer functions after handshake", ->
     conn = new MockConnection()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     peer = rpc.handshake(conn)
-    conn._recv simplex.handshake.accept
+    conn._recv duplex.handshake.accept
     args =
       foo: "bar"
     reply =
@@ -146,14 +146,14 @@ describe "simple RPC", ->
         expect(rep).toEqual reply
         replied = true
       conn._recv JSON.stringify
-        type: simplex.reply
+        type: duplex.reply
         id: 1
         payload: reply
     waitsFor -> replied
 
   it "calls remote peer functions after accept", ->
     conn = new MockConnection()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     peer = rpc.accept(conn)
     conn._recv handshake("json")
     args =
@@ -166,14 +166,14 @@ describe "simple RPC", ->
         expect(rep).toEqual reply
         replied = true
       conn._recv JSON.stringify
-        type: simplex.reply
+        type: duplex.reply
         id: 1
         payload: reply
     waitsFor -> replied
 
   it "can do all handshake, accept, call, and handle", ->
     [conn1, conn2] = connectionPair()
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.register("echo-tag", (ch) ->
       ch.onrecv = (obj) ->
         obj.tag = true
@@ -197,7 +197,7 @@ describe "simple RPC", ->
     waitsFor -> replies == 2
 
   it "streams multiple results", (done) ->
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.register("count", testServices.generator)
     count = 0
     peerPair rpc, (client, _) ->
@@ -207,7 +207,7 @@ describe "simple RPC", ->
           done()
 
   it "streams multiple arguments", (done) ->
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.register("adder", testServices.adder)
     peerPair rpc, (client, _) ->
       ch = client.open "adder"
@@ -218,7 +218,7 @@ describe "simple RPC", ->
         ch.send num, num != 5
 
   it "supports other codecs for serialization", (done) ->
-    rpc = new simplex.RPC(b64json)
+    rpc = new duplex.RPC(b64json)
     rpc.register("echo", testServices.echo)
     peerPair rpc, (client, server) ->
       client.call "echo", {foo: "bar"}, (rep) ->
@@ -226,7 +226,7 @@ describe "simple RPC", ->
         done()
 
   it "maintains optional ext from request to reply", (done) ->
-    rpc = new simplex.RPC(simplex.JSON)
+    rpc = new duplex.RPC(duplex.JSON)
     rpc.register("echo", testServices.echo)
     peerPair rpc, (client, server) ->
       ch = client.open "echo"
