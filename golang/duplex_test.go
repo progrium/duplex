@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -418,5 +419,28 @@ func TestHiddenExt(t *testing.T) {
 	Fatal(err, t)
 	if msg["ext"].(map[string]interface{})["hidden"] != "metadata" {
 		t.Fatal("Unexpected ext:", msg["ext"])
+	}
+}
+
+func TestRegisterFuncAndCallbackFunc(t *testing.T) {
+	rpc := NewRPC(NewJSONCodec())
+	rpc.RegisterFunc("callback", func(arg interface{}, ch *Channel) (interface{}, error) {
+		args := arg.([]interface{})
+		var ret interface{}
+		err := ch.Call(args[0].(string), args[1].(string), &ret)
+		if err != nil {
+			return nil, err
+		}
+		return ret, nil
+	})
+	client, _ := NewPeerPair(rpc)
+	upper := rpc.CallbackFunc(func(args interface{}, _ *Channel) (interface{}, error) {
+		return strings.ToUpper(args.(string)), nil
+	})
+	var reply string
+	err := client.Call("callback", []string{upper, "hello"}, &reply)
+	Fatal(err, t)
+	if reply != "HELLO" {
+		t.Fatal("Unexpected reply:", reply)
 	}
 }

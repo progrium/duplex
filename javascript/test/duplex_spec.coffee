@@ -6,6 +6,7 @@ class MockConnection
   constructor: ->
     @sent = []
     @closed = false
+    @pairedWith = null
     @onrecv = ->
 
   close: ->
@@ -14,28 +15,15 @@ class MockConnection
   send: (frame) ->
     #console.log(frame)
     @sent.push frame
+    if @pairedWith
+      @pairedWith.onrecv(frame)
 
   _recv: (frame) ->
     @onrecv frame
 
-class PairedConnection
-  constructor: ->
-    @pairedWith = null
-    @sent = []
-    @closed = false
-    @onrecv = ->
-
-  close: ->
-    @closed = true
-    @pairedWith?.close()
-
-  send: (frame) ->
-    @sent.push frame
-    @pairedWith.onrecv(frame)
-
 connectionPair = ->
-  conn1 = new PairedConnection()
-  conn2 = new PairedConnection()
+  conn1 = new MockConnection()
+  conn2 = new MockConnection()
   conn1.pairedWith = conn2
   conn2.pairedWith = conn1
   [conn1, conn2]
@@ -55,10 +43,12 @@ testServices =
   echo: (ch) ->
     ch.onrecv = (obj) ->
       ch.send obj
+
   generator: (ch) ->
     ch.onrecv = (count) ->
       for num in [1..count]
         ch.send({num: num}, num != count)
+
   adder: (ch) ->
     total = 0
     ch.onrecv = (num, more) ->
@@ -67,17 +57,14 @@ testServices =
         ch.send(total)
 
 
+
 b64json = [
   "b64json"
   (obj) -> btoa(JSON.stringify(obj))
   (str) -> JSON.parse(atob(str))
 ]
 
-describe "duplex module", ->
-  it "has a version", ->
-    expect(duplex.version).toBeDefined()
-
-describe "simple RPC", ->
+describe "duplex RPC", ->
   it "handshakes", ->
     conn = new MockConnection()
     rpc = new duplex.RPC(duplex.JSON)
@@ -237,3 +224,14 @@ describe "simple RPC", ->
           .toEqual {"hidden": "metadata"}
         done()
       ch.send {"foo": "bar"}, false
+
+  it "registers func for traditional RPC methods and callbacks", (done) ->
+    rpc = new duplex.RPC(duplex.JSON)
+    rpc.registerFunc "callback", (args, reply, ch) ->
+      ch.call args[0], args[1], (cbReply) ->
+        reply(cbReply)
+    peerPair rpc, (client, server) ->
+      upper = rpc.callbackFunc (s, r) -> r(s.toUpperCase())
+      client.call "callback", [upper, "hello"], (rep) ->
+        expect(rep).toEqual "HELLO"
+        done()

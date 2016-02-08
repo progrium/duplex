@@ -75,6 +75,16 @@ errorMsg = (id, code, message, data, ext)->
     msg.ext = ext
   msg
 
+UUIDv4 = ->
+  d = new Date().getTime()
+  if typeof window?.performance?.now == "function"
+    d += performance.now() # use high-precision timer if available
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace /[xy]/g, (c) ->
+    r = (d + Math.random()*16)%16 | 0
+    d = Math.floor(d/16)
+    if c != 'x'
+      r = r & 0x3 | 0x8
+    r.toString(16)
 
 class duplex.RPC
   constructor: (@codec)->
@@ -82,8 +92,21 @@ class duplex.RPC
     @decode = @codec[2]
     @registered = {}
 
-  register: (method, func) ->
-    @registered[method] = func
+  register: (method, handler) ->
+    @registered[method] = handler
+
+  unregister: (method) ->
+    delete @registered[method]
+
+  registerFunc: (method, func) ->
+    @register method, (ch) ->
+      ch.onrecv = (args) ->
+        func(args, ((reply, more=false) -> ch.send reply, more), ch)
+
+  callbackFunc: (func) ->
+    name = "_callback."+UUIDv4()
+    @registerFunc(name, func)
+    name
 
   _handshake: ->
     p = duplex.protocol
@@ -141,6 +164,9 @@ class duplex.Peer
     ch
 
   onrecv: (frame) =>
+    if frame == ""
+      # ignore empty frames
+      return
     msg = @rpc.decode(frame)
     # TODO: catch decode error
     switch msg.type

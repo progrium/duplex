@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sync"
+
+	"github.com/pborman/uuid"
 )
 
 /*
@@ -70,6 +73,7 @@ func NewJSONCodec() *Codec {
 }
 
 type RPC struct {
+	sync.Mutex
 	codec      *Codec
 	registered map[string]func(*Channel) error
 }
@@ -81,8 +85,37 @@ func NewRPC(codec *Codec) *RPC {
 	}
 }
 
-func (rpc *RPC) Register(name string, fn func(*Channel) error) {
-	rpc.registered[name] = fn
+func (rpc *RPC) Register(name string, handler func(*Channel) error) {
+	rpc.Lock()
+	defer rpc.Unlock()
+	rpc.registered[name] = handler
+}
+
+func (rpc *RPC) Unregister(name string) {
+	rpc.Lock()
+	defer rpc.Unlock()
+	delete(rpc.registered, name)
+}
+
+func (rpc *RPC) RegisterFunc(name string, fn func(interface{}, *Channel) (interface{}, error)) {
+	rpc.Register(name, func(ch *Channel) error {
+		var args interface{}
+		_, err := ch.Recv(&args)
+		if err != nil {
+			return err
+		}
+		ret, err := fn(args, ch)
+		if err != nil {
+			return err
+		}
+		return ch.Send(ret, false)
+	})
+}
+
+func (rpc *RPC) CallbackFunc(fn func(interface{}, *Channel) (interface{}, error)) string {
+	name := "_callback." + uuid.New()
+	rpc.RegisterFunc(name, fn)
+	return name
 }
 
 func (rpc *RPC) Handshake(conn io.ReadWriteCloser) (*Peer, error) {
@@ -156,6 +189,10 @@ func (peer *Peer) route() {
 			// TODO: what happens on read error
 			break
 		}
+		if n == 0 {
+			// ignore empty frames
+			continue
+		}
 		var msg Message
 		err = peer.rpc.codec.Decode(frame[:n], &msg)
 		if err != nil {
@@ -177,7 +214,9 @@ func (peer *Peer) route() {
 						peer.reqCh[ch.id] = ch
 					}
 				}
+				peer.rpc.Lock()
 				fn, exists := peer.rpc.registered[msg.Method]
+				peer.rpc.Unlock()
 				if exists {
 					go fn(ch)
 				} else {
