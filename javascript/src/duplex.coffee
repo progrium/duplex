@@ -213,7 +213,9 @@ class duplex.Channel
     @peer.close()
 
   open: (method, onreply) ->
-    @peer.open(method, onreply)
+    ch = @peer.open(method, onreply)
+    ch.ext = @ext
+    ch
 
   send: (payload, more=false) ->
     switch @type
@@ -229,7 +231,7 @@ class duplex.Channel
   senderr: (code, message, data) ->
     assert "Not reply channel", @type != duplex.reply
     @peer.conn.send @peer.rpc.encode(
-      errorMsg(@id, code, message, data, @context))
+      errorMsg(@id, code, message, data, @ext))
 
 if window?
   # For use in the browser

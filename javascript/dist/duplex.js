@@ -317,7 +317,10 @@
     };
 
     Channel.prototype.open = function(method, onreply) {
-      return this.peer.open(method, onreply);
+      var ch;
+      ch = this.peer.open(method, onreply);
+      ch.ext = this.ext;
+      return ch;
     };
 
     Channel.prototype.send = function(payload, more) {
@@ -336,7 +339,7 @@
 
     Channel.prototype.senderr = function(code, message, data) {
       assert("Not reply channel", this.type !== duplex.reply);
-      return this.peer.conn.send(this.peer.rpc.encode(errorMsg(this.id, code, message, data, this.context)));
+      return this.peer.conn.send(this.peer.rpc.encode(errorMsg(this.id, code, message, data, this.ext)));
     };
 
     return Channel;
