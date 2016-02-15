@@ -3,7 +3,8 @@ import unittest
 import json
 import base64
 
-from .duplex import *
+from . import RPC
+from . import protocol
 
 try:
     spawn = asyncio.ensure_future
@@ -89,7 +90,7 @@ def echo(ch):
     yield from ch.send(obj)
 
 
-class DuplexTests(unittest.TestCase):
+class DuplexAsyncTests(unittest.TestCase):
 
     def setUp(self):
         self.loop = asyncio.new_event_loop()
@@ -115,7 +116,7 @@ class DuplexTests(unittest.TestCase):
     @async
     def test_handshake(self):
         conn = MockConnection(self.loop)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         yield from conn.inbox.put(protocol.handshake.accept)
         yield from rpc.handshake(conn, False)
         yield from conn.close()
@@ -124,7 +125,7 @@ class DuplexTests(unittest.TestCase):
     @async
     def test_accept(self):
         conn = MockConnection(self.loop)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         yield from conn.inbox.put(handshake("json"))
         yield from rpc.accept(conn, False)
         yield from conn.close()
@@ -134,19 +135,19 @@ class DuplexTests(unittest.TestCase):
     def test_registered_func_after_accept(self):
         conn = MockConnection(self.loop)
         conn.expectedSends.add(2)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         rpc.register("echo", echo)
         yield from conn.inbox.put(handshake("json"))
         peer = yield from rpc.accept(conn, False)
         req = {
-            'type': protocol.request,
+            'type': protocol.types.request,
             'method': "echo",
             'id': 1,
             'payload': {"foo": "bar"}
         }
         frame = json.dumps(req)
         yield from conn.inbox.put(frame)
-        yield from peer._route(1)
+        yield from peer.route(1)
         yield from conn.expectedSends.wait()
         yield from conn.close()
         self.assertEqual(len(conn.sent), 2)
@@ -155,19 +156,19 @@ class DuplexTests(unittest.TestCase):
     def test_registered_func_after_handshake(self):
         conn = MockConnection(self.loop)
         conn.expectedSends.add(2)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         rpc.register("echo", echo)
         yield from conn.inbox.put(protocol.handshake.accept)
         peer = yield from rpc.handshake(conn, False)
         req = {
-            'type': protocol.request,
+            'type': protocol.types.request,
             'method': "echo",
             'id': 1,
             'payload': {"foo": "bar"}
         }
         frame = json.dumps(req)
         yield from conn.inbox.put(frame)
-        yield from peer._route(1)
+        yield from peer.route(1)
         yield from conn.expectedSends.wait()
         yield from conn.close()
         self.assertEqual(len(conn.sent), 2)
@@ -176,13 +177,13 @@ class DuplexTests(unittest.TestCase):
     def test_call_after_handshake(self):
         conn = MockConnection(self.loop)
         conn.expectedSends.add(2)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         yield from conn.inbox.put(protocol.handshake.accept)
         peer = yield from rpc.handshake(conn, False)
         args = {"foo": "bar"}
         expectedReply = {"baz": "qux"}
         frame = json.dumps({
-            "type": protocol.reply,
+            "type": protocol.types.reply,
             "id": 1,
             "payload": expectedReply,
         })
@@ -193,7 +194,7 @@ class DuplexTests(unittest.TestCase):
         tasks = [
             self.spawn(peer.call("foobar", args)),
             self.spawn(inject_frame()),
-            peer._route(1),
+            peer.route(1),
         ]
         yield from asyncio.wait(tasks)
         reply = tasks[0].result()
@@ -204,13 +205,13 @@ class DuplexTests(unittest.TestCase):
     def test_call_after_accept(self):
         conn = MockConnection(self.loop)
         conn.expectedSends.add(2)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         yield from conn.inbox.put(handshake("json"))
         peer = yield from rpc.accept(conn, False)
         args = {"foo": "bar"}
         expectedReply = {"baz": "qux"}
         frame = json.dumps({
-            "type": protocol.reply,
+            "type": protocol.types.reply,
             "id": 1,
             "payload": expectedReply,
         })
@@ -221,7 +222,7 @@ class DuplexTests(unittest.TestCase):
         tasks = [
             self.spawn(peer.call("foobar", args)),
             self.spawn(inject_frame()),
-            peer._route(1),
+            peer.route(1),
         ]
         yield from asyncio.wait(tasks)
         reply = tasks[0].result()
@@ -231,7 +232,7 @@ class DuplexTests(unittest.TestCase):
     @async
     def test_all_on_paired_peers(self):
         conns = connection_pair(self.loop)
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         @asyncio.coroutine
         def echo_tag(ch):
             obj, _ = yield from ch.recv()
@@ -248,8 +249,8 @@ class DuplexTests(unittest.TestCase):
         tasks = [
             self.spawn(peer1.call("echo-tag", {"from": "peer1"})),
             self.spawn(peer2.call("echo-tag", {"from": "peer2"})),
-            peer1._route(2),
-            peer2._route(2),
+            peer1.route(2),
+            peer2.route(2),
         ]
         yield from asyncio.wait(tasks + peer1.tasks + peer2.tasks)
         yield from conns[0].close()
@@ -261,7 +262,7 @@ class DuplexTests(unittest.TestCase):
 
     @async
     def test_streaming_multiple_results(self):
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         @asyncio.coroutine
         def counter(ch):
             count, _ = yield from ch.recv()
@@ -272,7 +273,7 @@ class DuplexTests(unittest.TestCase):
         client, server = yield from peer_pair(self.loop, rpc)
         ch = client.open("count")
         yield from ch.send(5)
-        yield from server._route(1)
+        yield from server.route(1)
         @asyncio.coroutine
         def handle_results():
             more = True
@@ -286,7 +287,7 @@ class DuplexTests(unittest.TestCase):
             return count
         tasks = [
             self.spawn(handle_results()),
-            client._route(5), # kinda defeats the point
+            client.route(5), # kinda defeats the point
         ]
         yield from asyncio.wait(tasks + server.tasks)
         yield from client.close()
@@ -295,7 +296,7 @@ class DuplexTests(unittest.TestCase):
 
     @async
     def test_streaming_multiple_arguments(self):
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         @asyncio.coroutine
         def adder(ch):
             more = True
@@ -316,8 +317,8 @@ class DuplexTests(unittest.TestCase):
             return total
         tasks = [
             self.spawn(asyncio_sucks()),
-            server._route(5),
-            client._route(1),
+            server.route(5),
+            client.route(1),
         ]
         yield from asyncio.wait(tasks + server.tasks)
         yield from client.close()
@@ -337,8 +338,8 @@ class DuplexTests(unittest.TestCase):
         args = {"foo": "bar"}
         tasks = [
             self.spawn(client.call("echo", args)),
-            server._route(1),
-            client._route(1),
+            server.route(1),
+            client.route(1),
         ]
         yield from asyncio.wait(tasks + server.tasks)
         yield from client.close()
@@ -347,7 +348,7 @@ class DuplexTests(unittest.TestCase):
 
     @async
     def test_ext_fields(self):
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         rpc.register("echo", echo)
         client, server = yield from peer_pair(self.loop, rpc)
         args = {"foo": "bar"}
@@ -355,8 +356,8 @@ class DuplexTests(unittest.TestCase):
         ch = client.open("echo")
         ch.ext = ext
         yield from ch.send(args)
-        yield from server._route(1)
-        yield from client._route(1)
+        yield from server.route(1)
+        yield from client.route(1)
         reply, _ = yield from ch.recv()
         self.assertEqual(args, reply)
         yield from client.close()
@@ -366,7 +367,7 @@ class DuplexTests(unittest.TestCase):
 
     @async
     def test_register_func_and_callback_func(self):
-        rpc = RPC(JSONCodec, self.loop)
+        rpc = RPC("json", self.loop)
         @asyncio.coroutine
         def callback(args, ch):
             ret = yield from ch.call(args[0], args[1])
@@ -376,8 +377,8 @@ class DuplexTests(unittest.TestCase):
         upper = rpc.callback_func(lambda arg,ch: arg.upper())
         tasks = [
             self.spawn(client.call("callback", [upper, "hello"])),
-            server._route(2),
-            client._route(2),
+            server.route(2),
+            client.route(2),
         ]
         yield from asyncio.wait(tasks)
         yield from client.close()
