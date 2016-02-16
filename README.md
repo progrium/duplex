@@ -6,15 +6,14 @@ Full duplex RPC and service framework
  * Client and server combined into Peer object
  * Calls and callbacks in either direction
  * Optional streaming of results and arguments
- * Extensible with middleware
+ * Extensible with middleware (soon)
  * Easy to implement protocol and API
 
-Bring your own:
+Getting Started:
 
- * Serialization format
- * Framed transport
- * Auth mechanism
- * Whatever else
+ * [with Python](http://progrium.viewdocs.io/duplex/getting-started/python)
+ * with Go
+ * with JavaScript
 
 ## Tour
 
