@@ -79,7 +79,7 @@ Now we make a WebSocket connection using the builtin wrapper for `ws4py`. Then w
 
 ```python
 >>> conn = duplex.ws4py.Client("ws://localhost:3000")
->>> peer = duplex.handshake(conn)
+>>> peer = rpc.handshake(conn)
 ```
 
 We're ready to make calls!
