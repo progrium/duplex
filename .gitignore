@@ -2,6 +2,7 @@ javascript/demo/node_modules
 javascript/node_modules
 python/duplex.egg-info
 python/README
-python/duplex/__pycache__
+python/**/__pycache__
+python/dist
 demo/duplex.js
 **/*.pyc

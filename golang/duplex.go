@@ -272,8 +272,9 @@ func (peer *Peer) Call(method string, args interface{}, reply interface{}) error
 		if err != nil {
 			return err
 		}
+		return (<-ch.done).err
 	}
-	return (<-ch.done).err
+	return nil
 }
 
 func (peer *Peer) Open(service string) *Channel {
@@ -348,7 +349,9 @@ func (ch *Channel) Recv(obj interface{}) (bool, error) {
 			return false, ch.err
 		}
 		payload := reflect.ValueOf(msg.Payload)
-		reflect.ValueOf(obj).Elem().Set(payload)
+		if payload.IsValid() {
+			reflect.ValueOf(obj).Elem().Set(payload)
+		}
 		return msg.More, nil
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 type MockConn struct {
@@ -442,5 +443,32 @@ func TestRegisterFuncAndCallbackFunc(t *testing.T) {
 	Fatal(err, t)
 	if reply != "HELLO" {
 		t.Fatal("Unexpected reply:", reply)
+	}
+}
+
+func TestCallAsyncWhenReplyNil(t *testing.T) {
+	rpc := NewRPC(NewJSONCodec())
+	received := make(chan bool, 1)
+	sent := make(chan bool, 1)
+	rpc.Register("noreply", func(ch *Channel) error {
+		received <- true
+		return nil
+	})
+	client, _ := NewPeerPair(rpc)
+	go func() {
+		client.Call("noreply", nil, nil)
+		sent <- true
+	}()
+	done := make(chan bool)
+	go func() {
+		<-received
+		<-sent
+		done <- true
+	}()
+	select {
+	case <-done:
+		return
+	case <-time.After(1 * time.Second):
+		t.Fatal("blocking Call timeout")
 	}
 }

@@ -28,7 +28,7 @@ Duplex is an RPC protocol designed for dynamic (and some statically-typed) langu
 // rpc setup using gob
 ```
 
-While that alone is somehow already revolutionary for RPC protocols, it also has a bi-directional peer model, letting either side of the connection call or provide invocable service methods. This means implementations are both client and server, so you never have to worry about only having a client or only having a server library in your language. It also allows for flexible connection topologies (server connecting to clients), callbacks, and plugin architectures.
+While that alone is somehow already revolutionary for RPC protocols, it also combines client and server into a peer object, letting either side of the connection call or provide invocable service methods. This means you never have to worry about only having a client or only having a server library in your language. It also allows for flexible connection topologies (server connecting to clients), callbacks, and plugin architectures.
 
 ```python
 # server with methods connects to client
@@ -56,21 +56,15 @@ The protocol and API are also designed to be extensible, providing a middleware 
 
 # TODO
 
- * add peer ext to golang
- * add tests for peer ext
-
- Middleware hooks, for:
-
-  * Tracing
-  * Auth
-  * Stats
-  * Policy
-
- sendobj(conn, outgoing)
-   send (return)
-   error (exception, etc)
-   drop/ignore
- recvobj(conn, incoming)
-   handle (return)
-   drop/ignore
-   send back error
+ * document spec / api
+ * middleware hooks
+ * demo
+   * cross language, browser
+   * topologies: client-server, server-client, gateway
+   * transports: websocket, tcp, UDP
+   * codecs: json, msgpack, protobuf
+   * streaming: state sync, terminal
+   * callbacks: async reply, events, plugins
+   * gateway: behind firewall, client to client (browser)
+   * patterns: identity, reflection (cli), self docs
+   * implementation: code tour, api guide, protocol spec
