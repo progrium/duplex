@@ -80,6 +80,6 @@ Now we make a WebSocket connection using the builtin wrapper for `ws4py`. Then w
 ```
 We're ready to make calls!
 ```python
->>> peer.call("example.sum", [1,2,3])
+>>> peer.call("example.add", [1,2,3])
 6
 ```
