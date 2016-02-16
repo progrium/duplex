@@ -1,9 +1,5 @@
+# Duplex RPC for Python
 
+Full duplex RPC and service toolkit
 
-## TODO
-
- * decorator for rpc.register
- * Make asyncio optional
-   * Normal threaded design by default
-   * Threaded and asyncio methods: `send()` and `send_coro()`
- * More tests? Wrappers?
+For more information, see [README](http://github.com/progrium/duplex).

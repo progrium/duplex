@@ -13,8 +13,6 @@ README = os.path.join(root, 'README')
 if not os.path.exists(README):
     os.symlink(README + '.md', README)
 
-description = "Full duplex RPC and service framework"
-
 with open(os.path.join(root, 'README'), encoding='utf-8') as f:
     long_description = '\n\n'.join(f.read().split('\n\n')[1:])
 
@@ -32,12 +30,14 @@ setuptools.setup(
     author='Jeff Lindsay',
     author_email='progrium@gmail.com',
     url='https://github.com/progrium/duplex',
-    description=description,
+    description="Full duplex RPC and service toolkit",
     long_description=long_description,
     #download_url='https://pypi.python.org/pypi/duplex',
-    packages=[
-        'duplex',
-    ],
+    packages=setuptools.find_packages(),
+    include_package_data = True,
+    package_data = {
+        '': ['*.md'],
+    },
     extras_require={
         ':python_version=="3.3"': ['asyncio'],
     },

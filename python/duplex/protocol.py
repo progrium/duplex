@@ -1,8 +1,6 @@
 
 name = "SIMPLEX"
 version = "1.0"
-request = "req"
-reply = "rep"
 
 class types:
     request = "req"
