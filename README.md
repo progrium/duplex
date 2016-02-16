@@ -1,6 +1,6 @@
 # Duplex RPC
 
-Full duplex RPC and service framework
+Modern full-duplex RPC
 
  * Serialization and transport agnostic
  * Client and server combined into Peer object
@@ -9,7 +9,7 @@ Full duplex RPC and service framework
  * Extensible with middleware (soon)
  * Easy to implement protocol and API
 
-Getting Started:
+## Getting Started
 
  * [with Python](http://progrium.viewdocs.io/duplex/getting-started/python)
  * with Go
