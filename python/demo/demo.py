@@ -3,7 +3,7 @@ import asyncio
 import websockets
 import duplex
 
-rpc = duplex.RPC(duplex.JSONCodec)
+rpc = duplex.RPC("json")
 
 @asyncio.coroutine
 def echo(ch):
