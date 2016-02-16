@@ -1,2 +1,3 @@
 * decorator for rpc.register
 * More tests? Wrappers?
+* properly handle/bubble errors

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"sync"
 
@@ -35,7 +36,7 @@ var (
 	TypeReply       = "rep"
 	HandshakeAccept = "+OK"
 	BacklogSize     = 1024
-	MaxFrameSize    = 1024 * 8 // 8kb
+	MaxFrameSize    = int(math.Pow(1024, 3)) // 1gb
 )
 
 type Message struct {
