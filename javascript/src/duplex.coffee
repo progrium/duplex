@@ -188,10 +188,10 @@ class duplex.Peer
         ch.onrecv(msg.payload, msg.more)
       when duplex.reply
         if msg.error?
-          @repChan[msg.id].onerr msg.error
+          @repChan[msg.id]?.onerr msg.error
           delete @repChan[msg.id]
         else
-          @repChan[msg.id].onrecv msg.payload
+          @repChan[msg.id]?.onrecv msg.payload
           if msg.more == false
             delete @repChan[msg.id]
       else

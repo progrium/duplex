@@ -246,7 +246,7 @@
     };
 
     Peer.prototype.onrecv = function(frame) {
-      var ch, msg;
+      var ch, msg, ref, ref1;
       if (frame === "") {
         return;
       }
@@ -275,10 +275,14 @@
           return ch.onrecv(msg.payload, msg.more);
         case duplex.reply:
           if (msg.error != null) {
-            this.repChan[msg.id].onerr(msg.error);
+            if ((ref = this.repChan[msg.id]) != null) {
+              ref.onerr(msg.error);
+            }
             return delete this.repChan[msg.id];
           } else {
-            this.repChan[msg.id].onrecv(msg.payload);
+            if ((ref1 = this.repChan[msg.id]) != null) {
+              ref1.onrecv(msg.payload);
+            }
             if (msg.more === false) {
               return delete this.repChan[msg.id];
             }
