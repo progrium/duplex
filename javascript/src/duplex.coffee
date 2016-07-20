@@ -100,7 +100,7 @@ class duplex.RPC
 
   registerFunc: (method, func) ->
     @register method, (ch) ->
-      ch.onrecv = (args) ->
+      ch.onrecv = (err, args) ->
         func(args, ((reply, more=false) -> ch.send reply, more), ch)
 
   callbackFunc: (func) ->
@@ -147,20 +147,20 @@ class duplex.Peer
   close: ->
     @conn.close()
 
-  call: (method, args, onreply) ->
+  call: (method, args, callback) ->
     ch = new duplex.Channel(this, duplex.request, method, @ext)
-    if onreply?
+    if callback?
       ch.id = ++@lastId
-      ch.onrecv = onreply
+      ch.onrecv = callback
       @repChan[ch.id] = ch
     ch.send(args)
 
-  open: (method, onreply) ->
+  open: (method, callback) ->
     ch = new duplex.Channel(this, duplex.request, method, @ext)
     ch.id = ++@lastId
     @repChan[ch.id] = ch
-    if onreply?
-      ch.onrecv = onreply
+    if callback?
+      ch.onrecv = callback
     ch
 
   onrecv: (frame) =>
@@ -185,13 +185,13 @@ class duplex.Peer
           @rpc.registered[msg.method](ch)
         if msg.ext?
           ch.ext = msg.ext
-        ch.onrecv(msg.payload, msg.more)
+        ch.onrecv(null, msg.payload, msg.more)
       when duplex.reply
         if msg.error?
-          @repChan[msg.id]?.onerr msg.error
+          @repChan[msg.id]?.onrecv msg.error
           delete @repChan[msg.id]
         else
-          @repChan[msg.id]?.onrecv msg.payload
+          @repChan[msg.id]?.onrecv null, msg.payload, msg.more
           if msg.more == false
             delete @repChan[msg.id]
       else
@@ -202,18 +202,17 @@ class duplex.Channel
     assert "Channel expects Peer", @peer.constructor.name == "Peer"
     @id = null
     @onrecv = ->
-    @onerr = ->
 
-  call: (method, args, onreply) ->
-    ch = @peer.open(method, onreply)
+  call: (method, args, callback) ->
+    ch = @peer.open(method, callback)
     ch.ext = @ext
     ch.send(args)
 
   close: ->
     @peer.close()
 
-  open: (method, onreply) ->
-    ch = @peer.open(method, onreply)
+  open: (method, callback) ->
+    ch = @peer.open(method, callback)
     ch.ext = @ext
     ch
 
@@ -229,7 +228,7 @@ class duplex.Channel
         assert "Bad channel type"
 
   senderr: (code, message, data) ->
-    assert "Not reply channel", @type != duplex.reply
+    assert "Not reply channel", @type == duplex.reply
     @peer.conn.send @peer.rpc.encode(
       errorMsg(@id, code, message, data, @ext))
 

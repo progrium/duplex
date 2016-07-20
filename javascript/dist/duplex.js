@@ -147,7 +147,7 @@
 
     RPC.prototype.registerFunc = function(method, func) {
       return this.register(method, function(ch) {
-        return ch.onrecv = function(args) {
+        return ch.onrecv = function(err, args) {
           return func(args, (function(reply, more) {
             if (more == null) {
               more = false;
@@ -223,24 +223,24 @@
       return this.conn.close();
     };
 
-    Peer.prototype.call = function(method, args, onreply) {
+    Peer.prototype.call = function(method, args, callback) {
       var ch;
       ch = new duplex.Channel(this, duplex.request, method, this.ext);
-      if (onreply != null) {
+      if (callback != null) {
         ch.id = ++this.lastId;
-        ch.onrecv = onreply;
+        ch.onrecv = callback;
         this.repChan[ch.id] = ch;
       }
       return ch.send(args);
     };
 
-    Peer.prototype.open = function(method, onreply) {
+    Peer.prototype.open = function(method, callback) {
       var ch;
       ch = new duplex.Channel(this, duplex.request, method, this.ext);
       ch.id = ++this.lastId;
       this.repChan[ch.id] = ch;
-      if (onreply != null) {
-        ch.onrecv = onreply;
+      if (callback != null) {
+        ch.onrecv = callback;
       }
       return ch;
     };
@@ -272,16 +272,16 @@
           if (msg.ext != null) {
             ch.ext = msg.ext;
           }
-          return ch.onrecv(msg.payload, msg.more);
+          return ch.onrecv(null, msg.payload, msg.more);
         case duplex.reply:
           if (msg.error != null) {
             if ((ref = this.repChan[msg.id]) != null) {
-              ref.onerr(msg.error);
+              ref.onrecv(msg.error);
             }
             return delete this.repChan[msg.id];
           } else {
             if ((ref1 = this.repChan[msg.id]) != null) {
-              ref1.onrecv(msg.payload);
+              ref1.onrecv(null, msg.payload, msg.more);
             }
             if (msg.more === false) {
               return delete this.repChan[msg.id];
@@ -306,12 +306,11 @@
       assert("Channel expects Peer", this.peer.constructor.name === "Peer");
       this.id = null;
       this.onrecv = function() {};
-      this.onerr = function() {};
     }
 
-    Channel.prototype.call = function(method, args, onreply) {
+    Channel.prototype.call = function(method, args, callback) {
       var ch;
-      ch = this.peer.open(method, onreply);
+      ch = this.peer.open(method, callback);
       ch.ext = this.ext;
       return ch.send(args);
     };
@@ -320,9 +319,9 @@
       return this.peer.close();
     };
 
-    Channel.prototype.open = function(method, onreply) {
+    Channel.prototype.open = function(method, callback) {
       var ch;
-      ch = this.peer.open(method, onreply);
+      ch = this.peer.open(method, callback);
       ch.ext = this.ext;
       return ch;
     };
@@ -342,7 +341,7 @@
     };
 
     Channel.prototype.senderr = function(code, message, data) {
-      assert("Not reply channel", this.type !== duplex.reply);
+      assert("Not reply channel", this.type === duplex.reply);
       return this.peer.conn.send(this.peer.rpc.encode(errorMsg(this.id, code, message, data, this.ext)));
     };
 
