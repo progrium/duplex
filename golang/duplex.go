@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"reflect"
 	"sync"
 
 	"github.com/pborman/uuid"
+	"golang.org/x/net/context"
 )
 
 /*
@@ -36,7 +36,7 @@ var (
 	TypeReply       = "rep"
 	HandshakeAccept = "+OK"
 	BacklogSize     = 1024
-	MaxFrameSize    = int(math.Pow(1024, 3)) // 1gb
+	MaxFrameSize    = 1 << 20 // 1mb
 )
 
 type Message struct {
@@ -120,7 +120,7 @@ func (rpc *RPC) CallbackFunc(fn func(interface{}, *Channel) (interface{}, error)
 }
 
 func (rpc *RPC) Handshake(conn io.ReadWriteCloser) (*Peer, error) {
-	peer := NewPeer(rpc, conn)
+	peer := NewPeer(rpc, conn, nil)
 	handshake := []byte(fmt.Sprintf("%s/%s;%s",
 		ProtocolName, ProtocolVersion, rpc.codec.Name))
 	_, err := conn.Write(handshake)
@@ -140,7 +140,11 @@ func (rpc *RPC) Handshake(conn io.ReadWriteCloser) (*Peer, error) {
 }
 
 func (rpc *RPC) Accept(conn io.ReadWriteCloser) (*Peer, error) {
-	peer := NewPeer(rpc, conn)
+	return rpc.AcceptWith(conn, nil)
+}
+
+func (rpc *RPC) AcceptWith(conn io.ReadWriteCloser, ctx context.Context) (*Peer, error) {
+	peer := NewPeer(rpc, conn, ctx)
 	buf := make([]byte, 32)
 	_, err := conn.Read(buf)
 	if err != nil {
@@ -162,12 +166,14 @@ type Peer struct {
 	rpc     *RPC
 	conn    io.ReadWriteCloser
 	closeCh chan bool
+	ctx     context.Context
 }
 
-func NewPeer(rpc *RPC, conn io.ReadWriteCloser) *Peer {
+func NewPeer(rpc *RPC, conn io.ReadWriteCloser, ctx context.Context) *Peer {
 	peer := &Peer{
 		rpc:     rpc,
 		conn:    conn,
+		ctx:     ctx,
 		reqCh:   make(map[int]*Channel),
 		repCh:   make(map[int]*Channel),
 		closeCh: make(chan bool),
@@ -315,7 +321,16 @@ func (ch *Channel) SetExt(ext interface{}) {
 	ch.ext = ext
 }
 
-// TODO: SendError
+func (ch *Channel) SendErr(code int, message string, data interface{}) error {
+	return ch.sendMsg(&Message{
+		Type:   ch.typ,
+		Method: ch.method,
+		More:   false,
+		Id:     ch.id,
+		Ext:    ch.ext,
+		Error:  &Error{code, message, data},
+	})
+}
 
 // not convenient enough? we'll see
 func (ch *Channel) SendLast(obj interface{}) error {
@@ -323,14 +338,17 @@ func (ch *Channel) SendLast(obj interface{}) error {
 }
 
 func (ch *Channel) Send(obj interface{}, more bool) error {
-	msg := Message{
+	return ch.sendMsg(&Message{
 		Type:    ch.typ,
 		Method:  ch.method,
 		Payload: obj,
 		More:    more,
 		Id:      ch.id,
 		Ext:     ch.ext,
-	}
+	})
+}
+
+func (ch *Channel) sendMsg(msg *Message) error {
 	frame, err := ch.rpc.codec.Encode(msg)
 	if err != nil {
 		return err
@@ -338,7 +356,7 @@ func (ch *Channel) Send(obj interface{}, more bool) error {
 	_, err = ch.conn.Write(frame)
 	if ch.id == 0 {
 		ch.done <- ch
-		close(ch.inbox)
+		close(ch.inbox) // is this bad?
 	}
 	return err
 }
@@ -355,6 +373,10 @@ func (ch *Channel) Recv(obj interface{}) (bool, error) {
 		}
 		return msg.More, nil
 	}
+}
+
+func (ch *Channel) Context() context.Context {
+	return ch.Peer.ctx
 }
 
 /*

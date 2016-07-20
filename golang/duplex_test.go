@@ -12,6 +12,11 @@ import (
 	"time"
 )
 
+const (
+	TestErrorCode    = 1000
+	TestErrorMessage = "Test Message"
+)
+
 type MockConn struct {
 	sync.Mutex
 
@@ -127,9 +132,30 @@ func Generator(ch *Channel) error {
 	return nil
 }
 
+func GeneratorThatErrorsAfterSecond(ch *Channel) error {
+	var count float64
+	if _, err := ch.Recv(&count); err != nil {
+		return err
+	}
+	var i float64
+	for i = 1; i <= count; i++ {
+		m := map[string]float64{"num": i}
+		if err := ch.Send(m, i != count); err != nil {
+			return err
+		}
+		if i == 2 {
+			if err := ch.SendErr(TestErrorCode, TestErrorMessage, nil); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
 func Adder(ch *Channel) error {
-	var total float64 = 0
-	var more bool = true
+	var total = 0.0
+	var more = true
 	var err error
 	var count float64
 	for more {
@@ -139,6 +165,10 @@ func Adder(ch *Channel) error {
 		total += count
 	}
 	return ch.Send(total, false)
+}
+
+func ReturnError(ch *Channel) error {
+	return ch.SendErr(TestErrorCode, TestErrorMessage, nil)
 }
 
 func Handshake(codec string) string {
@@ -245,7 +275,7 @@ func TestCallAfterHandshake(t *testing.T) {
 	err = peer.Call("foobar", args, &reply)
 	Fatal(err, t)
 	if reply["baz"] != expectedReply["baz"] {
-		t.Fatal("Unexpted reply:", reply)
+		t.Fatal("Unexpected reply:", reply)
 	}
 }
 
@@ -273,7 +303,7 @@ func TestCallAfterAccept(t *testing.T) {
 	err = peer.Call("foobar", args, &reply)
 	Fatal(err, t)
 	if reply["baz"] != expectedReply["baz"] {
-		t.Fatal("Unexpted reply:", reply)
+		t.Fatal("Unexpected reply:", reply)
 	}
 }
 
@@ -292,23 +322,23 @@ func TestAllOnPairedPeers(t *testing.T) {
 	})
 	var wg sync.WaitGroup
 	var peer1, peer2 *Peer
-	var err error
+	var err1, err2 error
 	wg.Add(2)
 	go func() {
-		peer1, err = rpc.Accept(conn1)
-		Fatal(err, t)
+		peer1, err1 = rpc.Accept(conn1)
+		Fatal(err1, t)
 		wg.Done()
 	}()
 	go func() {
-		peer2, err = rpc.Handshake(conn2)
-		Fatal(err, t)
+		peer2, err2 = rpc.Handshake(conn2)
+		Fatal(err2, t)
 		wg.Done()
 	}()
 	wg.Wait()
 	wg.Add(2)
 	go func() {
 		var reply map[string]interface{}
-		err = peer1.Call("echo-tag", map[string]string{"from": "peer1"}, &reply)
+		err := peer1.Call("echo-tag", map[string]string{"from": "peer1"}, &reply)
 		Fatal(err, t)
 		if reply["from"] != "peer1" || reply["tag"] != true {
 			t.Fatal("Unexpected reply to peer1:", reply)
@@ -317,7 +347,7 @@ func TestAllOnPairedPeers(t *testing.T) {
 	}()
 	go func() {
 		var reply map[string]interface{}
-		err = peer2.Call("echo-tag", map[string]string{"from": "peer2"}, &reply)
+		err := peer2.Call("echo-tag", map[string]string{"from": "peer2"}, &reply)
 		Fatal(err, t)
 		if reply["from"] != "peer2" || reply["tag"] != true {
 			t.Fatal("Unexpected reply to peer2:", reply)
@@ -335,14 +365,14 @@ func TestStreamingMultipleResults(t *testing.T) {
 	err := ch.Send(5, false)
 	Fatal(err, t)
 	var reply map[string]interface{}
-	var more bool = true
-	var count float64 = 0
+	var more = true
+	var count = 0.0
 	loops := 0
 	for more {
 		more, err = ch.Recv(&reply)
 		Fatal(err, t)
 		count += reply["num"].(float64)
-		loops += 1
+		loops++
 		if loops > 5 {
 			t.Fatal("Too many loops")
 		}
@@ -401,7 +431,7 @@ func TestCustomCodec(t *testing.T) {
 	}
 }
 
-func TestHiddenExt(t *testing.T) {
+func TestHiddenExt_EXPERIMENTAL(t *testing.T) {
 	rpc := NewRPC(NewJSONCodec())
 	rpc.Register("echo", Echo)
 	client, server := NewPeerPair(rpc)
@@ -470,5 +500,66 @@ func TestCallAsyncWhenReplyNil(t *testing.T) {
 		return
 	case <-time.After(1 * time.Second):
 		t.Fatal("blocking Call timeout")
+	}
+}
+
+func TestErrorReplyCall(t *testing.T) {
+	rpc := NewRPC(NewJSONCodec())
+	rpc.Register("errorReply", ReturnError)
+	client, _ := NewPeerPair(rpc)
+	var reply interface{}
+	err := client.Call("errorReply", nil, &reply)
+	if err != nil {
+		rpcError, ok := err.(*Error)
+		if !ok {
+			Fatal(err, t)
+		}
+		if rpcError.Code != TestErrorCode {
+			t.Fatal("Unexpected error code:", rpcError)
+		}
+		if rpcError.Message != TestErrorMessage {
+			t.Fatal("Unexpected error message:", rpcError)
+		}
+	} else {
+		t.Fatal("No error returned")
+	}
+}
+
+func TestErrorInStream(t *testing.T) {
+	rpc := NewRPC(NewJSONCodec())
+	rpc.Register("errorInStream", GeneratorThatErrorsAfterSecond)
+	client, _ := NewPeerPair(rpc)
+	ch := client.Open("errorInStream")
+	err := ch.Send(5, false)
+	Fatal(err, t)
+	var reply map[string]interface{}
+	var more = true
+	var count = 0.0
+	var rpcError *Error
+	var ok bool
+	loops := 0
+	for more {
+		more, err = ch.Recv(&reply)
+		if err != nil {
+			rpcError, ok = err.(*Error)
+			if !ok {
+				Fatal(err, t)
+			}
+			break
+		}
+		count = reply["num"].(float64)
+		loops++
+		if loops > 5 {
+			t.Fatal("Too many loops")
+		}
+	}
+	if rpcError.Code != TestErrorCode {
+		t.Fatal("Unexpected error code:", rpcError)
+	}
+	if rpcError.Message != TestErrorMessage {
+		t.Fatal("Unexpected error message:", rpcError)
+	}
+	if count != 2 {
+		t.Fatal("Unexpected final count:", count)
 	}
 }
