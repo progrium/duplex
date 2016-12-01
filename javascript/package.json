@@ -1,13 +1,14 @@
 {
-  "name": "duplex",
-  "description": "Full duplex RPC and service framework",
+  "name": "duplex.js",
+  "description": "Duplex RPC and service framework for JS",
   "license": "MIT",
   "repository": "https://github.com/progrium/duplex",
   "version": "0.1.0",
-  "devDependencies" : {
+  "devDependencies": {
     "jasmine-node": "*",
     "atob": "*",
-    "btoa": "*"
+    "btoa": "*",
+    "coffee-script": "^1.10.0"
   },
   "main": "./dist/duplex.js"
 }

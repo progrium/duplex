@@ -232,6 +232,41 @@ class duplex.Channel
     @peer.conn.send @peer.rpc.encode(
       errorMsg(@id, code, message, data, @ext))
 
+# high level wrapper for duplex over websocket
+#  * call buffering when not connected
+#  * default retries (very basic right now)
+#  * manages setting up peer / handshake
+class duplex.API
+  constructor: (endpoint) ->
+    parts = endpoint.split(":")
+    assert "Invalid endpoint", parts.length > 1
+    scheme = parts.shift()
+    [protocol, codec] = scheme.split("+", 2)
+    unless codec?
+      codec = "json"
+    assert "JSON is only supported codec", codec == "json"
+    parts.unshift(protocol)
+    url = parts.join(":")
+    @queued = []
+    @rpc = new duplex.RPC(duplex.JSON)
+    connect = (url) =>
+      @ws = new WebSocket(url)
+      @ws.onopen = () =>
+        @rpc.handshake(duplex.wrap.websocket(@ws), (p) =>
+          @peer = p
+          for args in @queued
+            do (args) => @call(args...)
+        )
+      @ws.onclose = () =>
+        setTimeout (() => connect(url)), 2000
+    connect(url)
+
+  call: (args...) ->
+    if @peer?
+      @peer.call(args...)
+    else
+      @queued.push(args)
+
 if window?
   # For use in the browser
   window.duplex = duplex

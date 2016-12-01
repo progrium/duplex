@@ -1,10 +1,10 @@
 .PHONY: test build
 
 build:
-	coffee -o dist/ -c src/
+	node_modules/.bin/coffee -o dist/ -c src/
 
 test: build
-	jasmine-node --verbose --coffee test
+	node_modules/.bin/jasmine-node --verbose --coffee test
 
 demo: build
 	cd demo && node server.js
