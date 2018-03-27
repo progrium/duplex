@@ -1,10 +1,10 @@
 .PHONY: test build
 
 build:
-	node_modules/.bin/coffee -o dist/ -c src/
+	tsc; cp ./src/duplex.js ./dist/duplex.js;
 
 test: build
-	node_modules/.bin/jasmine-node --verbose --coffee test
+	node_modules/.bin/jasmine-node --verbose test
 
 demo: build
 	cd demo && node server.js

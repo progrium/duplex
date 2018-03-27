@@ -10,5 +10,9 @@
     "btoa": "*",
     "coffee-script": "^1.10.0"
   },
-  "main": "./dist/duplex.js"
+  "main": "./dist/duplex.js",
+  "dependencies": {
+    "typescript": "^2.8.1",
+    "underscore": "^1.8.3"
+  }
 }

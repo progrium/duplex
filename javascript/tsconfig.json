@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "noImplicitAny": true,
+        "removeComments": true,
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "lib": ["es6"],
+        "target": "es6"
+    },
+    "files": [
+        "./src/duplex.ts",
+        "./test/duplex_spec.ts"
+    ]
+}
