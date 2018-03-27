@@ -1,6 +1,6 @@
 export {}
 
-const assert = function(description: string, condition: boolean) {
+const assert = function(description: string, condition: boolean): void {
   // We assert assumed state so we can more easily catch bugs.
   // Do not assert if we *know* the user can get to it.
   // HOWEVER in development there are asserts instead of exceptions...
@@ -29,7 +29,7 @@ let duplex = {
 
   // Builtin connection wrappers
   wrap: {
-    "websocket"(ws: object) {
+    "websocket"(ws: WebSocket): object {
       const conn = {
         send(msg: string) { return (<any>ws).send(msg); },
         close() { return (<any>ws).close(); }
@@ -49,7 +49,7 @@ let duplex = {
   }
 };
 
-const requestMsg = function(payload: object | number | string, method: string, id: number, more: boolean, ext: object | undefined) {
+const requestMsg = function(payload: object | number | string, method: string, id: number, more: boolean, ext: object | undefined): object {
   const msg = {
     type: duplex.request,
     method,
@@ -67,7 +67,7 @@ const requestMsg = function(payload: object | number | string, method: string, i
   return msg;
 };
 
-const replyMsg = function(id: number, payload: object | number | string, more: boolean, ext: object | undefined) {
+const replyMsg = function(id: number, payload: object | number | string, more: boolean, ext: object | undefined): object {
   const msg = {
     type: duplex.reply,
     id,
@@ -82,7 +82,7 @@ const replyMsg = function(id: number, payload: object | number | string, more: b
   return msg;
 };
 
-const errorMsg = function(id: number, code: number, message: string, data: object | undefined, ext: object | undefined) {
+const errorMsg = function(id: number, code: number, message: string, data: object | undefined, ext: object | undefined): object {
   const msg = {
     type: duplex.reply,
     id,
@@ -123,32 +123,32 @@ const UUIDv4 = function(): string {
     (<any>this).registered = {};
   }
 
-  register(method: string, handler: object) {
+  register(method: string, handler: object): object {
     return (<any>this).registered[method] = handler;
   }
 
-  unregister(method: string) {
+  unregister(method: string): boolean {
     return delete (<any>this).registered[method];
   }
 
-  registerFunc(method: string, func: (args: object, f1: object, ch: object) => object) {
+  registerFunc(method: string, func: (args: object, f1: object, ch: object) => object): object {
     return this.register(method, (ch: object) =>
       (<any>ch).onrecv = (err: object | null, args: object) => func(args, ( (reply: any, more: boolean | null) => { if (more == null) { more = false; } return (<any>ch).send(reply, more); }), ch)
     );
   }
 
-  callbackFunc(func: (args: object, f1: object, ch: object) => object) {
+  callbackFunc(func: (args: object, f1: object, ch: object) => object): string {
     const name = `_callback.${UUIDv4()}`;
     this.registerFunc(name, func);
     return name;
   }
 
-  _handshake() {
+  _handshake(): string {
     const p = duplex.protocol;
     return `${p.name}/${p.version};${(<any>this).codec[0]}`;
   }
 
-  handshake(conn: object, onready: object | undefined) {
+  handshake(conn: object, onready: object | undefined): object {
     const peer = new (<any>duplex).Peer(this, conn, onready);
     (<any>conn).onrecv = function(data: Array<string>) {
       if (data[0] === "+") {
@@ -162,7 +162,7 @@ const UUIDv4 = function(): string {
     return peer;
   }
 
-  accept(conn: object, onready: object | undefined) {
+  accept(conn: object, onready: object | undefined): object {
     const peer = new (<any>duplex).Peer(this, conn, onready);
     (<any>conn).onrecv = function(data: any) {
       // TODO: check handshake
@@ -189,15 +189,15 @@ const UUIDv4 = function(): string {
     (<any>this).repChan = {};
   }
 
-  _ready(peer: object) {
+  _ready(peer: object): object {
     return (<any>this).onready(peer);
   }
 
-  close() {
+  close(): object {
     return (<any>this).conn.close();
   }
 
-  call(method: string, args: object | number, callback: object) {
+  call(method: string, args: object | number, callback: object): object {
     const ch = new (<any>duplex).Channel(this, duplex.request, method, (<any>this).ext);
     if (callback != null) {
       ch.id = ++(<any>this).lastId;
@@ -207,7 +207,7 @@ const UUIDv4 = function(): string {
     return ch.send(args);
   }
 
-  open(method: string, callback: object | undefined) {
+  open(method: string, callback: object | undefined): object {
     const ch = new (<any>duplex).Channel(this, duplex.request, method, (<any>this).ext);
     ch.id = ++(<any>this).lastId;
     (<any>this).repChan[ch.id] = ch;
@@ -279,23 +279,23 @@ const UUIDv4 = function(): string {
     (<any>this).onrecv = function() {};
   }
 
-  call(method: string, args: string, callback: object | undefined) {
+  call(method: string, args: string, callback: object | undefined): object {
     const ch = (<any>this).peer.open(method, callback);
     ch.ext = (<any>this).ext;
     return ch.send(args);
   }
 
-  close() {
+  close(): object {
     return (<any>this).peer.close();
   }
 
-  open(method: string, callback: object | undefined) {
+  open(method: string, callback: object | undefined): object {
     const ch = (<any>this).peer.open(method, callback);
     ch.ext = (<any>this).ext;
     return ch;
   }
 
-  send(payload: object | number | string, more: boolean | undefined) {
+  send(payload: object | number | string, more: boolean | undefined): any {
     if (more == null) { more = false; }
     switch ((<any>this).type) {
       case duplex.request:
@@ -311,7 +311,7 @@ const UUIDv4 = function(): string {
     }
   }
 
-  senderr(code: number, message: string, data: object | undefined) {
+  senderr(code: number, message: string, data: object | undefined): object {
     assert("Not reply channel", (<any>this).type === duplex.reply);
     return (<any>this).peer.conn.send((<any>this).peer.rpc.encode(
       errorMsg((<any>this).id, code, message, data, (<any>this).ext))
@@ -353,7 +353,8 @@ const UUIDv4 = function(): string {
     connect(url);
   }
 
-  call(...args: Array<any>) {
+  call(...args: Array<any>): Array<any> {
+    console.log(args);
     if ((<any>this).peer != null) {
       return (<any>this).peer.call(...args || []);
     } else {
@@ -370,6 +371,6 @@ if (typeof window !== 'undefined' && window !== null) {
   (<any>exports).duplex = duplex;
 }
 
-function __guard__(value: any, transform: any) {
+function __guard__(value: any, transform: any): void {
   return (typeof value !== 'undefined' && value !== null) ? transform(value) : undefined;
 }

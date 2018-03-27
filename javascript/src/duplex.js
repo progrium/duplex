@@ -316,6 +316,7 @@ duplex.API = class API {
         connect(url);
     }
     call(...args) {
+        console.log(args);
         if (this.peer != null) {
             return this.peer.call(...args || []);
         }
