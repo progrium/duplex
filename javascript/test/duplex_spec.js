@@ -1,3 +1,5 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 const { duplex } = require('../dist/duplex.js');
 const btoa = require('btoa');
 const atob = require('atob');
@@ -34,7 +36,7 @@ const peerPair = function (rpc, onready) {
     let peer2;
     const [conn1, conn2] = connectionPair();
     const peer1 = rpc.accept(conn1);
-    return peer2 = rpc.handshake(conn2, peer2 => onready(peer1, peer2));
+    return peer2 = rpc.handshake(conn2, (peer2) => onready(peer1, peer2));
 };
 const handshake = function (codec) {
     const p = duplex.protocol;
@@ -78,8 +80,8 @@ const testServices = {
 };
 const b64json = [
     "b64json",
-    obj => btoa(JSON.stringify(obj)),
-    str => JSON.parse(atob(str))
+    (obj) => btoa(JSON.stringify(obj)),
+    (str) => JSON.parse(atob(str))
 ];
 describe("duplex RPC", function () {
     it("handshakes", function () {
@@ -187,7 +189,7 @@ describe("duplex RPC", function () {
     it("can do all handshake, accept, call, and handle", function () {
         const [conn1, conn2] = connectionPair();
         const rpc = new duplex.RPC(duplex.JSON);
-        rpc.register("echo-tag", ch => ch.onrecv = function (err, obj) {
+        rpc.register("echo-tag", (ch) => ch.onrecv = function (err, obj) {
             obj.tag = true;
             return ch.send(obj);
         });

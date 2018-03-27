@@ -1,3 +1,5 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
 const assert = function (description, condition) {
     if (condition == null) {
         condition = false;
@@ -6,7 +8,7 @@ const assert = function (description, condition) {
         throw Error(`Assertion: ${description}`);
     }
 };
-const duplex = {
+let duplex = {
     version: "0.1.0",
     protocol: {
         name: "SIMPLEX",
@@ -91,7 +93,7 @@ const errorMsg = function (id, code, message, data, ext) {
 };
 const UUIDv4 = function () {
     let d = new Date().getTime();
-    if (typeof __guard__(typeof window !== 'undefined' && window !== null ? window.performance : undefined, x => x.now) === "function") {
+    if (typeof __guard__(typeof window !== 'undefined' && window !== null ? window.performance : undefined, (x) => x.now) === "function") {
         d += performance.now();
     }
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -117,7 +119,7 @@ duplex.RPC = class RPC {
         return delete this.registered[method];
     }
     registerFunc(method, func) {
-        return this.register(method, ch => ch.onrecv = (err, args) => func(args, (function (reply, more) { if (more == null) {
+        return this.register(method, (ch) => ch.onrecv = (err, args) => func(args, ((reply, more) => { if (more == null) {
             more = false;
         } return ch.send(reply, more); }), ch));
     }
@@ -138,7 +140,7 @@ duplex.RPC = class RPC {
                 return peer._ready(peer);
             }
             else {
-                return assert(`Bad handshake: ${data}`);
+                return assert(`Bad handshake: ${data}`, false);
             }
         };
         conn.send(this._handshake());
@@ -240,7 +242,7 @@ duplex.Peer = class Peer {
                 }
                 break;
             default:
-                return assert("Invalid message");
+                return assert("Invalid message", false);
         }
     }
 };
@@ -277,7 +279,7 @@ duplex.Channel = class Channel {
             case duplex.reply:
                 return this.peer.conn.send(this.peer.rpc.encode(replyMsg(this.id, payload, more, this.ext)));
             default:
-                return assert("Bad channel type");
+                return assert("Bad channel type", false);
         }
     }
     senderr(code, message, data) {
@@ -299,12 +301,12 @@ duplex.API = class API {
         const url = parts.join(":");
         this.queued = [];
         this.rpc = new duplex.RPC(duplex.JSON);
-        var connect = url => {
+        var connect = (url) => {
             this.ws = new WebSocket(url);
             this.ws.onopen = () => {
-                return this.rpc.handshake(duplex.wrap.websocket(this.ws), p => {
+                return this.rpc.handshake(duplex.wrap.websocket(this.ws), (p) => {
                     this.peer = p;
-                    return this.queued.map((args) => (args => this.call(...args || []))(args));
+                    return this.queued.map((args) => ((args) => this.call(...args || []))(args));
                 });
             };
             return this.ws.onclose = () => {

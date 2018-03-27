@@ -5,10 +5,13 @@
   "repository": "https://github.com/progrium/duplex",
   "version": "0.1.0",
   "devDependencies": {
-    "jasmine-node": "*",
+    "@types/jasmine": "^2.8.6",
+    "@types/node": "^9.6.0",
+    "@types/ws": "^4.0.1",
     "atob": "*",
     "btoa": "*",
-    "coffee-script": "^1.10.0"
+    "coffee-script": "^1.10.0",
+    "jasmine-node": "*"
   },
   "main": "./dist/duplex.js",
   "dependencies": {
