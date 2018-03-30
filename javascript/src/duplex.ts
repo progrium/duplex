@@ -1,4 +1,3 @@
-export {}
 
 namespace Duplex {
 
@@ -41,6 +40,10 @@ namespace Duplex {
     }
   };
 
+  interface Registered {
+    [index: string]: (ch: Channel) => void;
+  };
+
   export class RPC {
     constructor(public codec: Array<any>) {
       this.encode = this.codec[1];
@@ -48,11 +51,11 @@ namespace Duplex {
       this.registered = {};
     }
 
-    encode: (obj: object) => string;
+    encode: (obj: Message) => string;
     decode: (str: string) => Message;
-    registered: any;
+    registered: Registered;
 
-    register(method: string, handler: object): object {
+    register(method: string, handler: (ch: Channel) => void): (ch: Channel) => void {
       return this.registered[method] = handler;
     }
 
@@ -60,13 +63,13 @@ namespace Duplex {
       return delete this.registered[method];
     }
 
-    registerFunc(method: string, func: (args: object, f1: object, ch: Channel) => object): object {
+    registerFunc(method: string, func: (args: Array<any>, f1: (reply: any, more?: boolean) => any | void, ch: Channel) => Message | void): (ch: Channel) => void {
       return this.register(method, (ch: Channel) =>
-        ch.onrecv = (err: object, args: object) => func(args, ( (reply: any, more: boolean) => { if (more == null) { more = false; } return ch.send(reply, more); }), ch)
+        ch.onrecv = (err: object, args: Array<any>) => func(args, ( (reply: any, more: boolean) => { if (more == null) { more = false; } return ch.send(reply, more); }), ch)
       );
     }
 
-    callbackFunc(func: (args: object, f1: object, ch: Channel) => object): string {
+    callbackFunc(func: (args: Array<any> | string, f1: object, ch?: Channel) => Message | void): string {
       const name = `_callback.${UUIDv4()}`;
       this.registerFunc(name, func);
       return name;
@@ -77,9 +80,9 @@ namespace Duplex {
       return `${p.name}/${p.version};${this.codec[0]}`;
     }
 
-    handshake(conn: Connection, onready: (peer: Peer) => object | void): object {
+    handshake(conn: Connection, onready?: (peer?: Peer) => object | boolean | number | void): Peer {
       const peer = new Duplex.Peer(this, conn, onready);
-      conn.onrecv = function(data: Array<string>) {
+      conn.onrecv = function(data: string | Array<string>) {
         if (data[0] === "+") {
           conn.onrecv = peer.onrecv;
           return peer._ready(peer);
@@ -91,9 +94,9 @@ namespace Duplex {
       return peer;
     }
 
-    accept(conn: Connection, onready: (peer: Peer) => object | void): object {
+    accept(conn: Connection, onready?: (peer?: Peer) => object | number | void): Peer {
       const peer: Peer = new Duplex.Peer(this, conn, onready);
-      conn.onrecv = function(data: any) {
+      conn.onrecv = function(data: string | Array<string>) {
         // TODO: check handshake
         conn.onrecv = peer.onrecv;
         conn.send(Duplex.handshake.accept);
@@ -103,8 +106,12 @@ namespace Duplex {
     }
   };
 
+  interface ChannelArray {
+    [index: number]: Channel
+  };
+
   export class Peer {
-    constructor(public rpc: RPC, public conn: Connection, onready: (peer: Peer) => object | void) {
+    constructor(public rpc: RPC, public conn: Connection, onready: (peer: Peer) => object | boolean | number | void) {
       this.onrecv = this.onrecv.bind(this);
       if (onready == null) { onready = function({}) {}; }
       this.onready = onready;
@@ -116,21 +123,21 @@ namespace Duplex {
       this.repChan = {};
     }
 
-    onready: (peer: Peer) => object | void;
+    onready: (peer: Peer) => object | boolean | number | void;
     lastId: number;
     ext: object;
-    reqChan: any;
-    repChan: any;
+    reqChan: ChannelArray;
+    repChan: ChannelArray;
 
-    _ready(peer: Peer): object | void {
+    _ready(peer: Peer): object | boolean | number | void {
       return this.onready(peer);
     }
 
-    close(): object {
+    close(): void {
       return this.conn.close();
     }
 
-    call(method?: string, args?: object | number, callback?: object): any {
+    call(method?: string, args?: any, callback?: object): void {
       const ch: Channel = new Duplex.Channel(this, Duplex.request, method, this.ext);
       if (callback != null) {
         ch.id = ++this.lastId;
@@ -140,7 +147,7 @@ namespace Duplex {
       return ch.send(args);
     }
 
-    open(method: string, callback: object): Channel {
+    open(method: string, callback?: object): Channel {
       const ch: Channel = new Duplex.Channel(this, Duplex.request, method, this.ext);
       ch.id = ++this.lastId;
       this.repChan[ch.id] = ch;
@@ -211,13 +218,13 @@ namespace Duplex {
     id: number;
     onrecv: any;
 
-    call(method: string, args: string, callback: object): object {
+    call(method: string, args: Array<any>, callback: object): Message | void {
       const ch: Channel = this.peer.open(method, callback);
       ch.ext = this.ext;
       return ch.send(args);
     }
 
-    close(): object {
+    close(): void {
       return this.peer.close();
     }
 
@@ -227,7 +234,7 @@ namespace Duplex {
       return ch;
     }
 
-    send(payload: object | number | string, more?: boolean): any {
+    send(payload: object | number | string, more?: boolean): void {
       if (more == null) { more = false; }
       switch (this.type) {
         case Duplex.request:
@@ -243,7 +250,7 @@ namespace Duplex {
       }
     }
 
-    senderr(code: number, message: string, data: object): object {
+    senderr(code: number, message: string, data?: string | Array<string>): void {
       assert("Not reply channel", this.type === Duplex.reply);
       return this.peer.conn.send(this.peer.rpc.encode(
         errorMsg(this.id, code, message, data, this.ext))
@@ -275,7 +282,7 @@ namespace Duplex {
           return this.rpc.handshake(Duplex.wrap.websocket(this.ws), (p: any) => {
             this.peer = p;
             return this.queued.map((args: Array<any>) =>
-              ((args: any) => this.call(...args || []))(args));
+              ((args: Array<any>) => this.call(...args || []))(args));
           });
         };
         return this.ws.onclose = () => {
@@ -290,7 +297,7 @@ namespace Duplex {
     ws: WebSocket;
     peer: Peer;
 
-    call(...args: Array<any>): number {
+    call(...args: Array<any>): void | number {
       console.log(args);
       if (this.peer != null) {
         return this.peer.call(...args || []);
@@ -309,13 +316,14 @@ interface Message {
   id?: number,
   more?: boolean,
   ext?: object,
-  error?: { code: number, message: string, data?: object }
+  error?: { code: number, message: string, data?: string | Array<string> }
 };
 
 interface Connection {
   onrecv?(data: string | Array<string>): any,
-  send(msg: string): any,
-  close(): any
+  send(msg: string): void,
+  close(): void,
+  sent?: Array<any>
 };
 
 
@@ -327,7 +335,7 @@ const assert = function(description: string, condition: boolean): void {
   if (!condition) { throw Error(`Assertion: ${description}`); }
 };
 
-const requestMsg = function(payload: object | number | string, method: string, id: number, more: boolean, ext: object): object {
+const requestMsg = function(payload: object | number | string, method: string, id: number, more: boolean, ext: object): Message {
   const msg: Message = {
     type: Duplex.request,
     method,
@@ -345,7 +353,7 @@ const requestMsg = function(payload: object | number | string, method: string, i
   return msg;
 };
 
-const replyMsg = function(id: number, payload: object | number | string, more: boolean, ext: object): object {
+const replyMsg = function(id: number, payload: object | number | string, more: boolean, ext: object): Message {
   const msg: Message = {
     type: Duplex.reply,
     id,
@@ -360,7 +368,7 @@ const replyMsg = function(id: number, payload: object | number | string, more: b
   return msg;
 };
 
-const errorMsg = function(id: number, code: number, message: string, data: object, ext: object): object {
+const errorMsg = function(id: number, code: number, message: string, data: string | Array<string>, ext: object): Message {
   const msg: Message = {
     type: Duplex.reply,
     id,
@@ -415,7 +423,7 @@ if (typeof window !== 'undefined' && window !== null) {
   (<any>window).duplex = duplexInstance;
 } else {
   // For Node / testing
-  (<any>exports).duplex = duplexInstance;
+  exports.duplex = duplexInstance;
 }
 
 function __guard__(value: any, transform: any): void {

@@ -1,5 +1,3 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
 var Duplex;
 (function (Duplex) {
     Duplex.version = "0.1.0";
@@ -35,6 +33,7 @@ var Duplex;
             return conn;
         }
     };
+    ;
     class RPC {
         constructor(codec) {
             this.codec = codec;
@@ -87,6 +86,7 @@ var Duplex;
         }
     }
     Duplex.RPC = RPC;
+    ;
     ;
     class Peer {
         constructor(rpc, conn, onready) {
