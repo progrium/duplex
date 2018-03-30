@@ -1,5 +1,15 @@
 export {}
 
+interface Message {
+  type: string,
+  payload?: string | number | object,
+  method?: string,
+  id?: number,
+  more?: boolean,
+  ext?: object,
+  error?: { code: number, message: string, data?: object }
+};
+
 const assert = function(description: string, condition: boolean): void {
   // We assert assumed state so we can more easily catch bugs.
   // Do not assert if we *know* the user can get to it.
@@ -31,17 +41,17 @@ let duplex = {
   wrap: {
     "websocket"(ws: WebSocket): object {
       const conn = {
-        send(msg: string) { return (<any>ws).send(msg); },
-        close() { return (<any>ws).close(); }
+        send(msg: string) { return ws.send(msg); },
+        close() { return ws.close(); }
       };
-      (<any>ws).onmessage = (event: object) => (<any>conn).onrecv((<any>event).data);
+      ws.onmessage = (event: object) => (<any>conn).onrecv((<any>event).data);
       return conn;
     },
 
-    "nodejs-websocket"(ws: object) {
+    "nodejs-websocket"(ws: WebSocket) {
       const conn = {
-        send(msg: string) { return (<any>ws).send(msg); },
-        close() { return (<any>ws).close(); }
+        send(msg: string) { return ws.send(msg); },
+        close() { return ws.close(); }
       };
       (<any>ws).on("text", (msg: string) => (<any>conn).onrecv(msg));
       return conn;
@@ -49,41 +59,41 @@ let duplex = {
   }
 };
 
-const requestMsg = function(payload: object | number | string, method: string, id: number, more: boolean, ext: object | undefined): object {
-  const msg = {
+const requestMsg = function(payload: object | number | string, method: string, id: number, more: boolean, ext: object): object {
+  const msg: Message = {
     type: duplex.request,
     method,
     payload
   };
   if (id != null) {
-    (<any>msg).id = id;
+    msg.id = id;
   }
   if (more === true) {
-    (<any>msg).more = more;
+    msg.more = more;
   }
   if (ext != null) {
-    (<any>msg).ext = ext;
+    msg.ext = ext;
   }
   return msg;
 };
 
-const replyMsg = function(id: number, payload: object | number | string, more: boolean, ext: object | undefined): object {
-  const msg = {
+const replyMsg = function(id: number, payload: object | number | string, more: boolean, ext: object): object {
+  const msg: Message = {
     type: duplex.reply,
     id,
     payload
   };
   if (more === true) {
-    (<any>msg).more = more;
+    msg.more = more;
   }
   if (ext != null) {
-    (<any>msg).ext = ext;
+    msg.ext = ext;
   }
   return msg;
 };
 
-const errorMsg = function(id: number, code: number, message: string, data: object | undefined, ext: object | undefined): object {
-  const msg = {
+const errorMsg = function(id: number, code: number, message: string, data: object, ext: object): object {
+  const msg: Message = {
     type: duplex.reply,
     id,
     error: {
@@ -92,10 +102,10 @@ const errorMsg = function(id: number, code: number, message: string, data: objec
     }
   };
   if (data != null) {
-    (<any>msg.error).data = data;
+    msg.error.data = data;
   }
   if (ext != null) {
-    (<any>msg).ext = ext;
+    msg.ext = ext;
   }
   return msg;
 };
@@ -148,7 +158,7 @@ const UUIDv4 = function(): string {
     return `${p.name}/${p.version};${(<any>this).codec[0]}`;
   }
 
-  handshake(conn: object, onready: object | undefined): object {
+  handshake(conn: object, onready: object): object {
     const peer = new (<any>duplex).Peer(this, conn, onready);
     (<any>conn).onrecv = function(data: Array<string>) {
       if (data[0] === "+") {
@@ -162,7 +172,7 @@ const UUIDv4 = function(): string {
     return peer;
   }
 
-  accept(conn: object, onready: object | undefined): object {
+  accept(conn: object, onready: object): object {
     const peer = new (<any>duplex).Peer(this, conn, onready);
     (<any>conn).onrecv = function(data: any) {
       // TODO: check handshake
@@ -175,7 +185,7 @@ const UUIDv4 = function(): string {
 };
 
 (<any>duplex).Peer = class Peer {
-  constructor(rpc: object, conn: object, onready: object | undefined) {
+  constructor(rpc: object, conn: object, onready: object) {
     this.onrecv = this.onrecv.bind(this);
     (<any>this).rpc = rpc;
     (<any>this).conn = conn;
@@ -207,7 +217,7 @@ const UUIDv4 = function(): string {
     return ch.send(args);
   }
 
-  open(method: string, callback: object | undefined): object {
+  open(method: string, callback: object): object {
     const ch = new (<any>duplex).Channel(this, duplex.request, method, (<any>this).ext);
     ch.id = ++(<any>this).lastId;
     (<any>this).repChan[ch.id] = ch;
@@ -269,7 +279,7 @@ const UUIDv4 = function(): string {
 };
 
 (<any>duplex).Channel = class Channel {
-  constructor(peer: object, type: string, method: string, ext: object | undefined) {
+  constructor(peer: object, type: string, method: string, ext: object) {
     (<any>this).peer = peer;
     (<any>this).type = type;
     (<any>this).method = method;
@@ -279,7 +289,7 @@ const UUIDv4 = function(): string {
     (<any>this).onrecv = function() {};
   }
 
-  call(method: string, args: string, callback: object | undefined): object {
+  call(method: string, args: string, callback: object): object {
     const ch = (<any>this).peer.open(method, callback);
     ch.ext = (<any>this).ext;
     return ch.send(args);
@@ -289,13 +299,13 @@ const UUIDv4 = function(): string {
     return (<any>this).peer.close();
   }
 
-  open(method: string, callback: object | undefined): object {
+  open(method: string, callback: object): object {
     const ch = (<any>this).peer.open(method, callback);
     ch.ext = (<any>this).ext;
     return ch;
   }
 
-  send(payload: object | number | string, more: boolean | undefined): any {
+  send(payload: object | number | string, more: boolean): any {
     if (more == null) { more = false; }
     switch ((<any>this).type) {
       case duplex.request:
@@ -311,7 +321,7 @@ const UUIDv4 = function(): string {
     }
   }
 
-  senderr(code: number, message: string, data: object | undefined): object {
+  senderr(code: number, message: string, data: object): object {
     assert("Not reply channel", (<any>this).type === duplex.reply);
     return (<any>this).peer.conn.send((<any>this).peer.rpc.encode(
       errorMsg((<any>this).id, code, message, data, (<any>this).ext))

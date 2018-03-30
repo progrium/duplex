@@ -39,7 +39,7 @@ const connectionPair = function(): Array<object> {
   return [conn1, conn2];
 };
 
-const peerPair = function(rpc: object, onready: (p1: object, p2: object | undefined) => object): object {
+const peerPair = function(rpc: object, onready: (p1: object, p2: object) => object): object {
   let peer2;
   const [conn1, conn2] = connectionPair();
   const peer1 = (<any>rpc).accept(conn1);

@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+;
 const assert = function (description, condition) {
     if (condition == null) {
         condition = false;
