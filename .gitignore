@@ -1,5 +1,6 @@
 javascript/demo/node_modules
 javascript/node_modules
+javascript/src/duplex.js
 python/duplex.egg-info
 python/README
 python/**/__pycache__
