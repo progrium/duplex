@@ -144,49 +144,41 @@ describe("duplex RPC", function () {
             }
         });
     });
-    it("calls remote peer functions after handshake", function () {
+    it("calls remote peer functions after handshake", function (done) {
         const conn = new MockConnection();
         const rpc = new duplex.RPC(duplex.JSON);
         const peer = rpc.handshake(conn);
         conn._recv(duplex.handshake.accept);
         const args = { foo: "bar" };
         const reply = { baz: "qux" };
-        let replied = false;
-        runs(function () {
-            peer.call("callAfterHandshake", args, function (err, rep) {
-                expect(rep).toEqual(reply);
-                return replied = true;
-            });
-            return conn._recv(JSON.stringify({
-                type: duplex.reply,
-                id: 1,
-                payload: reply
-            }));
+        peer.call("callAfterHandshake", args, function (err, rep) {
+            expect(rep).toEqual(reply);
+            done();
         });
-        return waitsFor(() => replied);
+        conn._recv(JSON.stringify({
+            type: duplex.reply,
+            id: 1,
+            payload: reply
+        }));
     });
-    it("calls remote peer functions after accept", function () {
+    it("calls remote peer functions after accept", function (done) {
         const conn = new MockConnection();
         const rpc = new duplex.RPC(duplex.JSON);
         const peer = rpc.accept(conn);
         conn._recv(handshake("json"));
         const args = { foo: "bar" };
         const reply = { baz: "qux" };
-        let replied = false;
-        runs(function () {
-            peer.call("callAfterAccept", args, function (err, rep) {
-                expect(rep).toEqual(reply);
-                return replied = true;
-            });
-            return conn._recv(JSON.stringify({
-                type: duplex.reply,
-                id: 1,
-                payload: reply
-            }));
+        peer.call("callAfterAccept", args, function (err, rep) {
+            expect(rep).toEqual(reply);
+            done();
         });
-        return waitsFor(() => replied);
+        conn._recv(JSON.stringify({
+            type: duplex.reply,
+            id: 1,
+            payload: reply
+        }));
     });
-    it("can do all handshake, accept, call, and handle", function () {
+    it("can do all handshake, accept, call, and handle", function (done) {
         const [conn1, conn2] = connectionPair();
         const rpc = new duplex.RPC(duplex.JSON);
         rpc.register("echo-tag", (ch) => ch.onrecv = function (err, obj) {
@@ -195,23 +187,25 @@ describe("duplex RPC", function () {
         });
         let ready = 0;
         let [peer1, peer2] = [null, null];
-        runs(function () {
-            peer1 = rpc.accept(conn1, () => ready++);
-            return peer2 = rpc.handshake(conn2, () => ready++);
-        });
-        waitsFor(() => ready === 2);
+        peer1 = rpc.accept(conn1, () => ready++);
+        peer2 = rpc.handshake(conn2, () => ready++);
         let replies = 0;
-        runs(function () {
+        setTimeout(function () {
             peer1.call("echo-tag", { from: "peer1" }, function (err, rep) {
                 expect(rep).toEqual({ from: "peer1", tag: true });
-                return replies++;
+                replies++;
+                if (replies === 2) {
+                    done();
+                }
             });
-            return peer2.call("echo-tag", { from: "peer2" }, function (err, rep) {
+            peer2.call("echo-tag", { from: "peer2" }, function (err, rep) {
                 expect(rep).toEqual({ from: "peer2", tag: true });
-                return replies++;
+                replies++;
+                if (replies === 2) {
+                    done();
+                }
             });
-        });
-        return waitsFor(() => replies === 2);
+        }, 1);
     });
     it("streams multiple results", function (done) {
         const rpc = new duplex.RPC(duplex.JSON);

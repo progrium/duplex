@@ -10,8 +10,7 @@
     "@types/ws": "^4.0.1",
     "atob": "*",
     "btoa": "*",
-    "coffee-script": "^1.10.0",
-    "jasmine-node": "*"
+    "jasmine-node": "^2.0.0"
   },
   "main": "./dist/duplex.js",
   "dependencies": {

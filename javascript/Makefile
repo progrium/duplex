@@ -1,9 +1,10 @@
 .PHONY: test build
 
 build:
-	tsc; cp ./src/duplex.js ./dist/duplex.js;
+	tsc; mv ./src/duplex.js ./dist/duplex.js;
+	cd test && tsc
 
-test: build
+test:
 	node_modules/.bin/jasmine-node --verbose test
 
 demo: build
